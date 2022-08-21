@@ -20,7 +20,15 @@ fn main() {
                     let mut data = [0 as u8; 50]; // 50 byte buffer
                     while match stream.read(&mut data) {
                         Ok(size) => {
-                            stream.write(&data[0..size]).unwrap();
+                            let len = data.iter().filter(|v| **v != 0).count();
+                            if len > 0 {
+                                println!("received msg: {:?}", &data);
+                                match stream.write(&data[0..size]) {
+                                    Ok(msg) => println!("Sent message: {:?}", msg),
+                                    Err(e) => println!("Error sending message: {:?}", e),
+                                };
+                                data = [0 as u8; 50];
+                            }
                             true
                         },
                         Err(_) => {
