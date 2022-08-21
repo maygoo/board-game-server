@@ -1,17 +1,16 @@
 use std::{
-    env, thread,
+    env,
+    thread,
     io::prelude::*,
-    net::{TcpListener, TcpStream, Shutdown},
-    str::from_utf8,
+    net::{TcpListener, Shutdown, SocketAddr}
 };
 
-// to get this running across the internet:
-//      port forward the corresponding port to the machine ip
-//      change listening ip for server to the machine ip (e.g. 192.168.1.24)
-//      change the sending ip for client to the global ip
-
 fn main() {
-    let listener = TcpListener::bind("0.0.0.0:3333").unwrap();
+    // get port from heroku
+    let port = env::var("PORT").ok().and_then(|port| port.parse::<u16>().ok()).unwrap_or(3333);
+    let addr = [0,0,0,0];
+
+    let listener = TcpListener::bind(SocketAddr::from((addr, port))).unwrap();
     println!("Server listening on port 3333");
     for stream in listener.incoming() {
         match stream {
