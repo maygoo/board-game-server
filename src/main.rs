@@ -11,7 +11,7 @@ fn main() {
     let addr = [0,0,0,0];
 
     let listener = TcpListener::bind(SocketAddr::from((addr, port))).unwrap();
-    println!("Server listening on port 3333");
+    println!("Server listening on port {}", port);
     for stream in listener.incoming() {
         match stream {
             Ok(mut stream) => {
