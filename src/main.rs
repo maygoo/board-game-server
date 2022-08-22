@@ -83,8 +83,10 @@ fn monitor_connections(connections: Arc<Mutex<Vec<Connection>>>) {
             thread::sleep(Duration::from_secs(2));
             let mut data = connections.lock().unwrap();
             
+            // print active connections only if connections change
+            let initial_len = data.len();
             data.retain(|connection| !connection.handle.is_finished());
-            print_connections(&data);
+            if data.len() != initial_len { print_connections(&data); }
         }
     });
 }
