@@ -3,13 +3,17 @@ use std::{
     thread::{self, JoinHandle},
     io::prelude::*,
     time::Duration,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, mpsc::{channel, Receiver, Sender}},
     net::{TcpListener, Shutdown, SocketAddr, TcpStream},
 };
 
-struct Connection {
+mod games;
+
+pub struct Connection {
     handle: JoinHandle<()>,
     addr: SocketAddr,
+    tx: Sender<String>,
+    rx: Receiver<String>,
 }
 
 fn main() {
@@ -24,6 +28,9 @@ fn main() {
     let connections: Arc<Mutex<Vec<Connection>>> = Arc::new(Mutex::new(Vec::new()));
     // spawn thread to monitor connections, removing finished threads
     monitor_connections(Arc::clone(&connections));
+
+    // test channel comms
+    games::test_connection(Arc::clone(&connections));
 
     match TcpListener::bind(addr) {
         Ok(listener) => {
@@ -45,22 +52,27 @@ fn handle_connection(mut stream: TcpStream, connections: Arc<Mutex<Vec<Connectio
 
     // set timeout for thread to close if no
     // message read recently
-    const TIMEOUT: Duration = Duration::from_secs(20);
+    const TIMEOUT: Duration = Duration::from_secs(60 * 10);
     stream.set_read_timeout(Some(TIMEOUT)).unwrap_or_default();
+
+    // create channel pair for duplex communication
+    let (tx_t, rx) = channel::<String>();
+    let (tx, rx_t) = channel::<String>();
 
     let t = thread::spawn(move|| {
         let mut data = [0 as u8; 50]; // 50 byte buffer
         while match stream.read(&mut data) {
-            Ok(size) => {
-                let len = data.iter().filter(|v| **v != 0).count();
-                if len > 0 {
-                    println!("received msg: {:?}", str::from_utf8(&data));
-                    match stream.write(&data[0..size]) {
-                        Ok(_) => println!("Successfuly echoed message."),
-                        Err(e) => println!("Error echoing message. {e}"),
-                    };
-                    data = [0 as u8; 50];
-                }
+            Ok(_) => {
+                println!("{:?}",&data);
+                let recv = String::from(str::from_utf8(&data).unwrap());
+                //println!("Received: {}", &recv);
+                tx_t.send(recv).unwrap();
+                let recv = rx_t.recv().unwrap();
+                println!("test receive end of channel with size {}: {:?}", recv.len() ,recv.as_bytes());
+                match stream.write(recv.as_bytes()) {
+                    Ok(size) => println!("Successfuly echoed message with size {size}."),
+                    Err(e) => println!("Error echoing message. {e}"),
+                };
                 true
             },
             Err(e) => {
@@ -71,7 +83,12 @@ fn handle_connection(mut stream: TcpStream, connections: Arc<Mutex<Vec<Connectio
         } {}
     });
 
-    add_and_print_connections(connections, Connection { handle: t, addr: client });
+    add_and_print_connections(connections, Connection {
+        handle: t,
+        addr: client,
+        tx,
+        rx,
+    });
 }
 
 // maintains a list of active connections
