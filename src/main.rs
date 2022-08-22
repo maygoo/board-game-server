@@ -1,20 +1,13 @@
 use std::{
     env, str,
-    thread::{self, JoinHandle},
+    thread,
     io::prelude::*,
     time::Duration,
-    sync::{Arc, Mutex, mpsc::{channel, Receiver, Sender}},
+    sync::mpsc::channel,
     net::{TcpListener, Shutdown, SocketAddr, TcpStream},
 };
 
 mod games;
-
-pub struct Connection {
-    handle: JoinHandle<()>,
-    addr: SocketAddr,
-    tx: Sender<String>,
-    rx: Receiver<String>,
-}
 
 fn main() {
     // initialise server with default binding 0.0.0.0:3334
@@ -25,19 +18,19 @@ fn main() {
     let addr = SocketAddr::from((DEFAULT_IP, port));
 
     // create shared vector for list of active connections
-    let connections: Arc<Mutex<Vec<Connection>>> = Arc::new(Mutex::new(Vec::new()));
+    let lobby = games::Lobby::new();
     // spawn thread to monitor connections, removing finished threads
-    monitor_connections(Arc::clone(&connections));
+    lobby.monitor();
 
     // test channel comms
-    games::test_connection(Arc::clone(&connections));
+    lobby.test_channel();
 
     match TcpListener::bind(addr) {
         Ok(listener) => {
             println!("Server listening on {}", listener.local_addr().unwrap());
             for stream in listener.incoming() {
                 match stream {
-                    Ok(stream) => handle_connection(stream, Arc::clone(&connections)),
+                    Ok(stream) => handle_connection(stream, &lobby),
                     Err(e) => eprintln!("Unable to connect. {e}"),
                 }
             }
@@ -46,7 +39,7 @@ fn main() {
     };
 }
 
-fn handle_connection(mut stream: TcpStream, connections: Arc<Mutex<Vec<Connection>>>) {
+fn handle_connection(mut stream: TcpStream, lobby: &games::Lobby) {
     let client = stream.peer_addr().unwrap();
     println!("Connected to {client}");
 
@@ -83,45 +76,10 @@ fn handle_connection(mut stream: TcpStream, connections: Arc<Mutex<Vec<Connectio
         } {}
     });
 
-    add_and_print_connections(connections, Connection {
-        handle: t,
+    lobby.add_and_print_connections(games::Player {
+        thread: t,
         addr: client,
         tx,
         rx,
     });
-}
-
-// maintains a list of active connections
-// by spawning a new thread and removing
-// finished TcpStream threads
-fn monitor_connections(connections: Arc<Mutex<Vec<Connection>>>) {
-    thread::spawn(move|| {
-        loop {
-            thread::sleep(Duration::from_secs(2));
-            let mut data = connections.lock().unwrap();
-            
-            // print active connections only if connections change
-            let initial_len = data.len();
-            data.retain(|connection| !connection.handle.is_finished());
-            if data.len() != initial_len { print_connections(&data); }
-        }
-    });
-}
-
-fn print_connections(connections: &Vec<Connection>) {
-    println!("Active connections:");
-    for connection in connections.iter() {
-        println!("  {}", connection.addr);
-    }
-}
-
-fn add_connection(connections: &mut Vec<Connection>, new: Connection) {
-    connections.push(new);
-}
-
-fn add_and_print_connections(connections: Arc<Mutex<Vec<Connection>>>, new: Connection) {
-    let mut data = connections.lock().unwrap();
-    print_connections(&data);
-    println!("  {}  <--  new", new.addr);
-    add_connection(&mut data, new)
 }
