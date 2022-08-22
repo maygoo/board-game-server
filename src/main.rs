@@ -1,5 +1,5 @@
 use std::{
-    env, str, fmt,
+    env, str,
     thread::{self, JoinHandle},
     io::prelude::*,
     time::Duration,
@@ -10,12 +10,6 @@ use std::{
 struct Connection {
     handle: JoinHandle<()>,
     addr: SocketAddr,
-}
-
-impl fmt::Display for Connection {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.addr)
-    }
 }
 
 fn main() {
@@ -98,7 +92,7 @@ fn monitor_connections(connections: Arc<Mutex<Vec<Connection>>>) {
 fn print_connections(connections: &Vec<Connection>) {
     println!("Active connections:");
     for connection in connections.iter() {
-        println!("  {}", connection);
+        println!("  {}", connection.addr);
     }
 }
 
@@ -109,6 +103,6 @@ fn add_connection(connections: &mut Vec<Connection>, new: Connection) {
 fn add_and_print_connections(connections: Arc<Mutex<Vec<Connection>>>, new: Connection) {
     let mut data = connections.lock().unwrap();
     print_connections(&data);
-    println!("  {}  <--  new", new);
+    println!("  {}  <--  new", new.addr);
     add_connection(&mut data, new)
 }
