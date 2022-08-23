@@ -1,29 +1,31 @@
 use std::{
     thread::{self, JoinHandle},
-    time::Duration,
     net::SocketAddr,
     sync::{Arc, Mutex},
     sync::mpsc::{Receiver, Sender},
 };
 
-//pub mod tic_tac_toe;
+use crate::WAIT;
 
+pub mod tic_tac_toe;
+
+#[derive(Debug)]
 enum Game {
     TicTacToe,
 }
 
-struct Session {
-    Player1: Player,
-    Player2: Player,
-    Game: Game,
+pub struct Session {
+    player1: SocketAddr,
+    player2: SocketAddr,
+    game: Option<Game>,
 }
 
 impl Session {
-    pub fn new(p1: Player, p2: Player, game: Game) -> Self {
+    pub fn new(player1: SocketAddr, player2: SocketAddr) -> Self {
         Session {
-            Player1: p1,
-            Player2: p2,
-            Game: game,
+            player1,
+            player2,
+            game: None,
         }
     }
 }
@@ -33,10 +35,29 @@ pub struct Lobby {
 }
 
 pub struct Player {
-    pub thread: JoinHandle<()>,
-    pub addr: SocketAddr,
-    pub tx: Sender<String>,
-    pub rx: Receiver<String>,
+    thread: JoinHandle<()>,
+    addr: SocketAddr,
+    tx: Sender<String>,
+    rx: Receiver<String>,
+    status: Status,
+}
+
+impl Player {
+    pub fn new(thread: JoinHandle<()>, addr: SocketAddr, tx: Sender<String>, rx: Receiver<String>) -> Self {
+        Player {
+            thread,
+            addr,
+            tx,
+            rx,
+            status: Status::Waiting,
+        }
+    }
+}
+
+#[derive(PartialEq)]
+enum Status {
+    Waiting,
+    Playing,
 }
 
 impl Lobby {
@@ -46,9 +67,42 @@ impl Lobby {
         }
     }
 
+    pub fn begin_game(&self) {
+        let players = Arc::clone(&self.players);
+
+        thread::spawn(move|| {
+            let mut pair;
+            while {
+                let mut data = players.lock().unwrap();
+                pair = Lobby::find_pair(&mut data);
+                pair.is_none()
+            } {
+                thread::sleep(WAIT);
+            }
+            let (player1, player2) = pair.unwrap();
+
+            let session = Session::new(player1, player2);
+            tic_tac_toe::begin(players, session);
+        });
+    }
+
+    // return two addrs for both players
+    fn find_pair(players: &mut Vec<Player>) -> Option<(SocketAddr, SocketAddr)> {
+        let mut waiting: Vec<&mut Player> = players.iter_mut().filter(|player| player.status == Status::Waiting).collect();
+
+        if waiting.len() < 2 { 
+            None
+        } else {
+            waiting[0].status = Status::Playing;
+            waiting[1].status = Status::Playing;
+            
+            Some((waiting[0].addr, waiting[1].addr))
+        }
+    }
+
     // test forwarding messages between tcp connections
     // through this central thread
-    pub fn pair_players(&self) {
+    pub fn _pair_players(&self) {
         let players = Arc::clone(&self.players);
         thread::spawn(move|| {
             // wait til we have 2 players
@@ -56,7 +110,7 @@ impl Lobby {
             let player2;
 
             loop {
-                thread::sleep(Duration::from_secs(2));
+                thread::sleep(WAIT);
                 let data = players.lock().unwrap();
                 if data.len() > 1 {
                     player1 = data[0].addr;
@@ -106,7 +160,7 @@ impl Lobby {
         let players = Arc::clone(&self.players);
         thread::spawn(move|| {
             loop {
-                thread::sleep(Duration::from_secs(2));
+                thread::sleep(WAIT);
                 let mut data = players.lock().unwrap();
                 
                 // print active connections only if connections change
