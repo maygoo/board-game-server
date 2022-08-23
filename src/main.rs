@@ -23,7 +23,7 @@ fn main() {
     lobby.monitor();
 
     // test channel comms
-    lobby.test_channel();
+    lobby.pair_players();
 
     match TcpListener::bind(addr) {
         Ok(listener) => {
@@ -43,37 +43,36 @@ fn handle_connection(mut stream: TcpStream, lobby: &games::Lobby) {
     let client = stream.peer_addr().unwrap();
     println!("Connected to {client}");
 
-    // set timeout for thread to close if no
-    // message read recently
-    const TIMEOUT: Duration = Duration::from_secs(60 * 10);
-    stream.set_read_timeout(Some(TIMEOUT)).unwrap_or_default();
-
     // create channel pair for duplex communication
     let (tx_t, rx) = channel::<String>();
     let (tx, rx_t) = channel::<String>();
 
     let t = thread::spawn(move|| {
         let mut data = [0 as u8; 50]; // 50 byte buffer
+        
+        // set a timeout on read so that read is nonblocking
+        // i.e. we can send without needing to read
+        stream.set_read_timeout(Some(Duration::from_millis(100))).unwrap_or_default();
         while match stream.read(&mut data) {
-            Ok(_) => {
-                println!("{:?}",&data);
+            Ok(size) if size > 0 => {
                 let recv = String::from(str::from_utf8(&data).unwrap());
-                //println!("Received: {}", &recv);
+                // send received data through channel to game controller
                 tx_t.send(recv).unwrap();
-                let recv = rx_t.recv().unwrap();
-                println!("test receive end of channel with size {}: {:?}", recv.len() ,recv.as_bytes());
-                match stream.write(recv.as_bytes()) {
-                    Ok(size) => println!("Successfuly echoed message with size {size}."),
-                    Err(e) => println!("Error echoing message. {e}"),
-                };
                 true
             },
-            Err(e) => {
-                println!("{e}.");
-                stream.shutdown(Shutdown::Both).unwrap();
-                false
-            }
-        } {}
+            Ok(_) => false, // connection is closed for sizes == 0
+            Err(_) => true, // continue because errors are timeout errors
+        } {
+            // receive data through channel from game controller
+            match rx_t.recv_timeout(Duration::from_millis(100)) {
+                Ok(recv) => {
+                    stream.write(recv.as_bytes()).unwrap();
+                }
+                _ => (),
+            };
+        }
+
+        stream.shutdown(Shutdown::Both).unwrap();
     });
 
     lobby.add_and_print_connections(games::Player {
