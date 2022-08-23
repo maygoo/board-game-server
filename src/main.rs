@@ -52,7 +52,7 @@ fn handle_connection(mut stream: TcpStream, lobby: &games::Lobby) {
         
         // set a timeout on read so that read is nonblocking
         // i.e. we can send without needing to read
-        stream.set_read_timeout(Some(Duration::from_millis(100))).unwrap_or_default();
+        stream.set_read_timeout(Some(Duration::from_millis(10))).unwrap_or_default();
         while match stream.read(&mut data) {
             Ok(size) if size > 0 => {
                 let recv = String::from(str::from_utf8(&data).unwrap());
@@ -64,12 +64,12 @@ fn handle_connection(mut stream: TcpStream, lobby: &games::Lobby) {
             Err(_) => true, // continue because errors are timeout errors
         } {
             // receive data through channel from game controller
-            match rx_t.recv_timeout(Duration::from_millis(100)) {
+            match rx_t.try_recv() {
                 Ok(recv) => {
                     stream.write(recv.as_bytes()).unwrap();
-                }
+                },
                 _ => (),
-            };
+            }
         }
 
         stream.shutdown(Shutdown::Both).unwrap();

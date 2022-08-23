@@ -69,7 +69,6 @@ impl Lobby {
             }
 
             loop {
-                thread::sleep(Duration::from_secs(2));
                 let data = players.lock().unwrap();
 
                 // check that player 1 and player 2 are both connected
@@ -79,7 +78,7 @@ impl Lobby {
                 
                 // test piping msgs between both players
                 // start with player 1
-                match data[0].rx.recv_timeout(Duration::from_millis(100)) {
+                match data[0].rx.try_recv() {
                     Ok(msg) => {
                         println!("Player 1 sent: {msg}");
                         data[1].tx.send(msg).unwrap();
@@ -87,7 +86,7 @@ impl Lobby {
                     _ => (),
                 }
 
-                match data[1].rx.recv_timeout(Duration::from_millis(100)) {
+                match data[1].rx.try_recv() {
                     Ok(msg) => {
                         println!("Player 2 sent: {msg}");
                         data[0].tx.send(msg).unwrap();
