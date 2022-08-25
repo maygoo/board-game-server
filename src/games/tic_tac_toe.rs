@@ -184,7 +184,7 @@ fn try_move(player: &Player, piece: Piece, state: &mut State) -> Result<(usize, 
                     state.board[y][x] = piece;
                     Ok((x, y))
                 }
-                p => Err(format!("{x} {x} already has a {p} on it! Enter another move")),
+                p => Err(format!("{} {} already has a {p} on it! Enter another move", (y + 65) as u8 as char, x+1)), // quick convert idxs to game coords
             }
         },
         Ok(m) => Err(format!("Wrong message type {m:?}")),
