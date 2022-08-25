@@ -112,6 +112,7 @@ pub fn begin(players: Arc<Mutex<Vec<Player>>>, mut session: super::Session) {
                         
                         Turn::CrossStart => {
                             Session::send(player1, Message::YourTurn).unwrap();
+                            Session::send(player2, Message::WaitTurn).unwrap();
                             state.turn = Turn::CrossWait;
                         },
                         Turn::CrossWait => {
@@ -125,11 +126,13 @@ pub fn begin(players: Arc<Mutex<Vec<Player>>>, mut session: super::Session) {
                                         state.turn = Turn::NoughtStart;    
                                     }
                                 },
+                                Err(e) if e.is_empty() => (),
                                 Err(e) => Session::send(player1, Message::InvalidMove(e)).unwrap(),
                             };
                         }
                         Turn::NoughtStart => {
                             Session::send(player2, Message::YourTurn).unwrap();
+                            Session::send(player1, Message::WaitTurn).unwrap();
                             state.turn = Turn::NoughtWait;
                         },
                         Turn::NoughtWait => {
@@ -140,10 +143,11 @@ pub fn begin(players: Arc<Mutex<Vec<Player>>>, mut session: super::Session) {
                                         state.winner = Piece::Nought;
                                         state.turn = Turn::End;
                                     } else {
-                                        state.turn = Turn::NoughtStart;    
+                                        state.turn = Turn::CrossStart;    
                                     }
                                 },
-                                Err(e) => Session::send(player1, Message::InvalidMove(e)).unwrap(),
+                                Err(e) if e.is_empty() => (),
+                                Err(e) => Session::send(player2, Message::InvalidMove(e)).unwrap(),
                             };
                         },
                         Turn::End => {
@@ -183,7 +187,8 @@ fn try_move(player: &Player, piece: Piece, state: &mut State) -> Result<(usize, 
                 p => Err(format!("{x} {x} already has a {p} on it! Enter another move")),
             }
         },
-        m => Err(format!("Wrong message type {m:?}")),
+        Ok(m) => Err(format!("Wrong message type {m:?}")),
+        Err(_) => Err(String::new()), // nothing received so return empty string
     }
 }
 
@@ -191,7 +196,7 @@ fn try_move(player: &Player, piece: Piece, state: &mut State) -> Result<(usize, 
 fn check_victory(state: &State, piece: Piece) -> bool {
     let board = &state.board;
 
-    // check for horizontal victory
+    // check for horizontal victoryD
     let mut win = board.iter().filter(|row| {
         row.iter().filter(|cell| {
             **cell == piece

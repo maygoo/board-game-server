@@ -70,8 +70,8 @@ fn handle_connection(mut stream: TcpStream, lobby: &games::Lobby) {
         } {
             // receive data through channel from game controller
             match rx_t.try_recv() {
-                Ok(recv) => {
-                    let send = bincode::serialize(&recv).unwrap();
+                Ok(send) => {
+                    let send = bincode::serialize(dbg!(&send)).unwrap();
                     stream.write(&send).unwrap();
                 },
                 _ => (),
