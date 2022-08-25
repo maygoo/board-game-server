@@ -32,14 +32,14 @@ pub enum Message {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-struct Config {
+pub struct Config {
     opponent: String,
     piece: Piece,
     boardsize: usize,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
-enum Piece {
+pub enum Piece {
     Nought,
     Cross,
     Empty

@@ -1,5 +1,5 @@
 use std::{
-    env, str,
+    env,
     thread,
     io::prelude::*,
     time::Duration,
