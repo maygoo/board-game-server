@@ -2,14 +2,15 @@ use std::{
     thread::{self, JoinHandle},
     net::SocketAddr,
     sync::{Arc, Mutex},
-    sync::mpsc::{Receiver, Sender},
+    sync::mpsc::{Receiver, Sender, SendError},
 };
 
 use crate::WAIT;
 
+use self::tic_tac_toe::Message;
+
 pub mod tic_tac_toe;
 
-#[derive(Debug)]
 enum Game {
     TicTacToe,
 }
@@ -21,12 +22,24 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(player1: SocketAddr, player2: SocketAddr) -> Self {
+    pub fn new((player1, player2): (SocketAddr, SocketAddr)) -> Self {
         Session {
             player1,
             player2,
             game: None,
         }
+    }
+
+    // TODO move these to player
+    pub fn send(player: &Player, msg: Message) -> Result<(), SendError<Message>> {
+        player.tx.send(msg)?;
+        Ok(())
+    }
+
+    pub fn broadcast(player1: &Player, player2: &Player, msg: Message) -> Result<(), SendError<Message>> {
+        Session::send(player1, msg.clone())?;
+        Session::send(player2, msg.clone())?;
+        Ok(())
     }
 }
 
@@ -37,13 +50,13 @@ pub struct Lobby {
 pub struct Player {
     thread: JoinHandle<()>,
     addr: SocketAddr,
-    tx: Sender<String>,
-    rx: Receiver<String>,
+    tx: Sender<tic_tac_toe::Message>,
+    rx: Receiver<tic_tac_toe::Message>,
     status: Status,
 }
 
 impl Player {
-    pub fn new(thread: JoinHandle<()>, addr: SocketAddr, tx: Sender<String>, rx: Receiver<String>) -> Self {
+    pub fn new(thread: JoinHandle<()>, addr: SocketAddr, tx: Sender<tic_tac_toe::Message>, rx: Receiver<tic_tac_toe::Message>) -> Self {
         Player {
             thread,
             addr,
@@ -71,18 +84,18 @@ impl Lobby {
         let players = Arc::clone(&self.players);
 
         thread::spawn(move|| {
-            let mut pair;
-            while {
-                let mut data = players.lock().unwrap();
-                pair = Lobby::find_pair(&mut data);
-                pair.is_none()
-            } {
+            loop {
                 thread::sleep(WAIT);
+                let mut data = players.lock().unwrap();
+                let pair = Lobby::find_pair(&mut data);
+                if pair.is_some() {
+                    // go through some process of selecting a game
+                    tic_tac_toe::begin(
+                        Arc::clone(&players), 
+                        Session::new(pair.unwrap())
+                    );
+                }
             }
-            let (player1, player2) = pair.unwrap();
-
-            let session = Session::new(player1, player2);
-            tic_tac_toe::begin(players, session);
         });
     }
 
@@ -98,59 +111,6 @@ impl Lobby {
             
             Some((waiting[0].addr, waiting[1].addr))
         }
-    }
-
-    // test forwarding messages between tcp connections
-    // through this central thread
-    pub fn _pair_players(&self) {
-        let players = Arc::clone(&self.players);
-        thread::spawn(move|| {
-            // wait til we have 2 players
-            let player1;
-            let player2;
-
-            loop {
-                thread::sleep(WAIT);
-                let data = players.lock().unwrap();
-                if data.len() > 1 {
-                    player1 = data[0].addr;
-                    player2 = data[1].addr;
-
-                    println!("Player 1 selected: {}", player1);
-                    println!("Player 2 selected: {}", player2);
-                    break;
-                }
-            }
-
-            loop {
-                let data = players.lock().unwrap();
-
-                // check that player 1 and player 2 are both connected
-                if data.len() < 2 || data[0].addr != player1 || data[1].addr != player2 {
-                    break;
-                }
-                
-                // test piping msgs between both players
-                // start with player 1
-                match data[0].rx.try_recv() {
-                    Ok(msg) => {
-                        println!("Player 1 sent: {msg}");
-                        data[1].tx.send(msg).unwrap();
-                    },
-                    _ => (),
-                }
-
-                match data[1].rx.try_recv() {
-                    Ok(msg) => {
-                        println!("Player 2 sent: {msg}");
-                        data[0].tx.send(msg).unwrap();
-                    },
-                    _ => (),
-                }
-            }
-
-            println!("Pair broken.");
-        });
     }
 
     // maintains a list of active connections
