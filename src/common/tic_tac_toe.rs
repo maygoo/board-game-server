@@ -4,10 +4,8 @@ use serde::{Serialize, Deserialize};
 #[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
 pub enum Turn {
     Begin,
-    CrossStart,
-    CrossWait,
-    NoughtStart,
-    NoughtWait,
+    TurnStart,
+    TurnWait,
     End,
 }
 
@@ -50,8 +48,9 @@ impl std::fmt::Display for Piece {
 pub struct ServerState {
     pub board: Board,
     pub turn: Turn,
-    pub crosses_player: String,
-    pub noughts_player: String,
+    pub current_player: Piece,
+    pub crosses_player: usize,
+    pub noughts_player: usize,
     pub winner: End,
 }
 
@@ -93,12 +92,12 @@ impl Board {
         self.grid[y][x] = p;
     }
 
-    pub fn try_place(&mut self, x: usize, y:usize, p: Piece) -> Result<(usize, usize), String> {
+    pub fn try_place(&mut self, x: usize, y:usize, p: Piece) -> Result<(Piece, usize, usize), String> {
         // check if cell is empty then do move
         match &mut self.grid[y][x] {
             Piece::Empty => {
-                self.place(x, y, p);
-                Ok((x, y))
+                self.place(x, y, p.clone());
+                Ok((p, x, y))
             }
             p => Err(format!("{} {} already has a {p} on it! Enter another move", (y + 65) as u8 as char, x+1)), // quick convert idxs to game coords
         }
@@ -210,8 +209,19 @@ impl ServerState {
             board: Board::new(board_size),
             turn: Turn::Begin,
             winner: End::Disconnect,
-            noughts_player: String::new(),
-            crosses_player: String::new(),
+            current_player: Piece::Cross,
+            noughts_player: 0,
+            crosses_player: 1,
+        }
+    }
+}
+
+impl Piece {
+    pub fn next(self) -> Self {
+        match self {
+            Piece::Cross => Piece::Nought,
+            Piece::Nought => Piece::Cross,
+            Piece::Empty => unreachable!(),
         }
     }
 }

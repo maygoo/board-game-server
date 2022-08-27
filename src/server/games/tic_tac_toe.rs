@@ -36,74 +36,56 @@ pub fn begin(players: Arc<Mutex<Vec<Player>>>, mut session: super::Session) {
         
         match players.len() {
             2 => {
-                let player1 = &players[0]; // player 1; crosses
-                let player2 = &players[1]; // player 2; noughts
+                let current_player;
+                let next_player;
+                if state.current_player == Piece::Cross {
+                    current_player = &players[state.crosses_player];
+                    next_player = &players[state.noughts_player];
+                } else {
+                    current_player = &players[state.noughts_player];
+                    next_player = &players[state.crosses_player];
+                }
+
                 match state.turn {
                     Turn::Begin => {
-                        let config1 = ClientState::new(player2.addr.to_string(), Piece::Cross, state.board.size);
-                        let config2 = ClientState::new(player1.addr.to_string(), Piece::Nought, state.board.size);
-
-                        Session::send(player1, Message::Preamble(config1)).unwrap();
-                        Session::send(player2, Message::Preamble(config2)).unwrap();
-                        println!("Found {} and {}", player1.addr, player2.addr);
-                        
-                        state.turn = Turn::CrossStart;
+                        let config1 = ClientState::new(next_player.addr.to_string(), Piece::Cross, state.board.size);
+                        let config2 = ClientState::new(current_player.addr.to_string(), Piece::Nought, state.board.size);
+                        Session::send(current_player, Message::Preamble(config1)).unwrap();
+                        Session::send(next_player, Message::Preamble(config2)).unwrap();
+                        println!("Found {} and {}", current_player.addr, next_player.addr);
+                        state.turn = Turn::TurnStart;
                     },
-                    
-                    Turn::CrossStart => {
-                        Session::send(player1, Message::YourTurn).unwrap();
-                        Session::send(player2, Message::WaitTurn).unwrap();
-                        state.turn = Turn::CrossWait;
+                    Turn::TurnStart => {
+                        Session::send(current_player, Message::YourTurn).unwrap();
+                        Session::send(next_player, Message::WaitTurn).unwrap();
+                        state.turn = Turn::TurnWait;
                     },
-                    Turn::CrossWait => {
-                        match super::try_recv(player1) {
+                    Turn::TurnWait => {
+                        match super::try_recv(current_player) {
                             Ok(Message::Move((_, x, y))) => {
-                                match state.board.try_place(x, y, Piece::Cross) {
-                                    Ok((x, y)) => {
-                                        Session::broadcast(player1, player2, Message::Move((Piece::Cross, x, y))).unwrap();
-                                        match state.board.check_victory(Piece::Cross) {
+                                match state.board.try_place(x, y, dbg!(state.current_player.clone())) {
+                                    Ok(m) => {
+                                        Session::broadcast(current_player, next_player, Message::Move(m)).unwrap();
+                                        match state.board.check_victory(state.current_player.clone()) {
                                             Some(end) => {
                                                 state.winner = end;
                                                 state.turn = Turn::End;
                                             },
-                                            None => state.turn = Turn::NoughtStart,
-                                        }
-                                    },
-                                    Err(e) => Session::send(player1, Message::InvalidMove(e)).unwrap(),
-                                }
-                            },
-                            Ok(m) => Session::send(player1, Message::InvalidMove(format!("Wrong message type {m:?}"))).unwrap(),
-                            Err(_) => (), // nothing received
-                        }
-                    }
-                    Turn::NoughtStart => {
-                        Session::send(player2, Message::YourTurn).unwrap();
-                        Session::send(player1, Message::WaitTurn).unwrap();
-                        state.turn = Turn::NoughtWait;
-                    },
-                    Turn::NoughtWait => {
-                        match super::try_recv(player2) {
-                            Ok(Message::Move((_, x, y))) => {
-                                match state.board.try_place(x, y, Piece::Nought) {
-                                    Ok((x, y)) => {
-                                        Session::broadcast(player1, player2, Message::Move((Piece::Nought, x, y))).unwrap();
-                                        match state.board.check_victory(Piece::Nought) {
-                                            Some(end) => {
-                                                state.winner = end;
-                                                state.turn = Turn::End;   
+                                            None => {
+                                                state.turn = Turn::TurnStart;
+                                                state.current_player = state.current_player.next();
                                             },
-                                            None => state.turn = Turn::CrossStart,
                                         }
                                     },
-                                    Err(e) => Session::send(player2, Message::InvalidMove(e)).unwrap(),
+                                    Err(e) => Session::send(current_player, Message::InvalidMove(e)).unwrap(),
                                 }
                             },
-                            Ok(m) => Session::send(player2, Message::InvalidMove(format!("Wrong message type {m:?}"))).unwrap(),
+                            Ok(m) => Session::send(current_player, Message::InvalidMove(format!("Wrong message type {m:?}"))).unwrap(),
                             Err(_) => (), // nothing received
                         }
                     },
                     Turn::End => {
-                        Session::broadcast(player1, player2, Message::GameOver(state.winner.clone())).unwrap();
+                        Session::broadcast(current_player, next_player, Message::GameOver(state.winner.clone())).unwrap();
                         players[0].status = super::Status::Waiting;
                         players[1].status = super::Status::Waiting;
                         println!("Game over, winner: {:?}", state.winner);
