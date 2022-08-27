@@ -1,5 +1,7 @@
 # Board Games with Rust
 
+[![Rust](https://github.com/maygoo/board-games-rust/actions/workflows/rust.yml/badge.svg)](https://github.com/maygoo/board-games-rust/actions/workflows/rust.yml)
+
 Small project to create a tcp server to facilitate online gameplay of various board games. Currently there is a working implementation for tic tac toe for any square board size.
 
 ## Crate Structure
