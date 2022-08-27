@@ -13,6 +13,7 @@ use common::tic_tac_toe::{
     ClientState,
     Piece,
     Board,
+    End,
 };
 
 fn main() {
@@ -78,7 +79,7 @@ fn play(msg: Message, state: &mut ClientState, rx: &Receiver<String>) -> Option<
             state.board = Board::new(state.board.size);
 
             let order = match state.piece {
-                Piece::Cross => "fisrt",
+                Piece::Cross => "first",
                 Piece::Nought => "second",
                 Piece::Empty => unreachable!("Player cannot be assigned the empty piece"),
             };
@@ -147,11 +148,12 @@ fn play(msg: Message, state: &mut ClientState, rx: &Receiver<String>) -> Option<
             println!("{e}");
             play(Message::YourTurn, state, rx)
         },
-        Message::GameOver(piece) => {
-            match piece {
-                Piece::Empty => println!("Opponent has disconnected. Exiting session and returning to lobby"),
-                p if p == state.piece => println!("Congratualtions you have won!\nThe session will end and you will be returned to the lobby"),
-                p if p != state.piece => println!("You lose!\nThe session will end and you will be returned to the lobby"),
+        Message::GameOver(end) => {
+            match end {
+                End::Disconnect => println!("Opponent has disconnected. Exiting session and returning to lobby"),
+                End::Victory(p) if p == state.piece => println!("Congratualtions you have won!\nThe session will end and you will be returned to the lobby"),
+                End::Victory(p) if p != state.piece => println!("You lose!\nThe session will end and you will be returned to the lobby"),
+                End::Draw => println!("The game has ended in a draw! There are no winners.\nThe session will end and you will be returned to the lobby"),
                 _ => unreachable!(),
             }
             None

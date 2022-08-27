@@ -20,7 +20,14 @@ pub enum Message {
     InvalidMove(String),
     // Nought or Cross piece means they win
     // Empty piece means game is over i.e. disconnect
-    GameOver(Piece),
+    GameOver(End),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum End {
+    Victory(Piece),
+    Draw,
+    Disconnect,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
@@ -45,7 +52,7 @@ pub struct ServerState {
     pub turn: Turn,
     pub crosses_player: String,
     pub noughts_player: String,
-    pub winner: Piece,
+    pub winner: End,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -97,7 +104,7 @@ impl Board {
         }
     }
     
-    pub fn check_victory(&self, piece: Piece) -> bool {
+    pub fn check_victory(&self, piece: Piece) -> Option<End> {
         // check for horizontal victory
         let mut win = self.grid.iter().filter(|row| {
             row.iter().filter(|cell| {
@@ -128,8 +135,23 @@ impl Board {
             if !flag1 && !flag2 { break; }
         }
         if flag1 || flag2 { win = 1; }
-        
-        win > 0
+
+        // if no one has won, check to see if there is a draw
+        if win < 1 {
+            if self.check_draw() {
+                Some(End::Draw)
+            } else {
+                None
+            }
+        } else {
+            Some(End::Victory(piece))
+        }
+    }
+
+    fn check_draw(&self) -> bool {
+        !self.grid.iter()
+            .map(|row| row.contains(&Piece::Empty))
+            .any(|p| p)
     }
 }
 
@@ -187,7 +209,7 @@ impl ServerState {
         ServerState {
             board: Board::new(board_size),
             turn: Turn::Begin,
-            winner: Piece::Empty,
+            winner: End::Disconnect,
             noughts_player: String::new(),
             crosses_player: String::new(),
         }

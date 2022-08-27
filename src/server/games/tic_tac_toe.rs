@@ -13,7 +13,9 @@ use common::tic_tac_toe::{
     Message,
     ServerState,
     Piece,
-    Turn, ClientState,
+    Turn,
+    ClientState,
+    End,
 };
 
 pub fn begin(players: Arc<Mutex<Vec<Player>>>, mut session: super::Session) {
@@ -59,11 +61,12 @@ pub fn begin(players: Arc<Mutex<Vec<Player>>>, mut session: super::Session) {
                                 match state.board.try_place(x, y, Piece::Cross) {
                                     Ok((x, y)) => {
                                         Session::broadcast(player1, player2, Message::Move((Piece::Cross, x, y))).unwrap();
-                                        if state.board.check_victory(Piece::Cross) {
-                                            state.winner = Piece::Cross;
-                                            state.turn = Turn::End;
-                                        } else {
-                                            state.turn = Turn::NoughtStart;    
+                                        match state.board.check_victory(Piece::Cross) {
+                                            Some(end) => {
+                                                state.winner = end;
+                                                state.turn = Turn::End;
+                                            },
+                                            None => state.turn = Turn::NoughtStart,
                                         }
                                     },
                                     Err(e) => Session::send(player1, Message::InvalidMove(e)).unwrap(),
@@ -84,11 +87,12 @@ pub fn begin(players: Arc<Mutex<Vec<Player>>>, mut session: super::Session) {
                                 match state.board.try_place(x, y, Piece::Nought) {
                                     Ok((x, y)) => {
                                         Session::broadcast(player1, player2, Message::Move((Piece::Nought, x, y))).unwrap();
-                                        if state.board.check_victory(Piece::Nought) {
-                                            state.winner = Piece::Nought;
-                                            state.turn = Turn::End;
-                                        } else {
-                                            state.turn = Turn::CrossStart;    
+                                        match state.board.check_victory(Piece::Nought) {
+                                            Some(end) => {
+                                                state.winner = end;
+                                                state.turn = Turn::End;   
+                                            },
+                                            None => state.turn = Turn::CrossStart,
                                         }
                                     },
                                     Err(e) => Session::send(player2, Message::InvalidMove(e)).unwrap(),
@@ -102,7 +106,7 @@ pub fn begin(players: Arc<Mutex<Vec<Player>>>, mut session: super::Session) {
                         Session::broadcast(player1, player2, Message::GameOver(state.winner.clone())).unwrap();
                         players[0].status = super::Status::Waiting;
                         players[1].status = super::Status::Waiting;
-                        println!("Game over, {} has won", state.winner);
+                        println!("Game over, winner: {:?}", state.winner);
                         break;
                     }
                 }
@@ -110,7 +114,7 @@ pub fn begin(players: Arc<Mutex<Vec<Player>>>, mut session: super::Session) {
             1 => {
                 let player = &mut players[0];
                 println!("One player dropped");
-                Session::send(player, Message::GameOver(Piece::Empty)).unwrap();
+                Session::send(player, Message::GameOver(End::Disconnect)).unwrap();
                 player.status = super::Status::Waiting;
                 break;
             },
