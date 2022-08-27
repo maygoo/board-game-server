@@ -2,15 +2,17 @@ use std::{
     thread::{self, JoinHandle},
     net::SocketAddr,
     sync::{Arc, Mutex},
-    sync::mpsc::{Receiver, Sender, SendError},
+    sync::mpsc::{Receiver, Sender, SendError, TryRecvError},
 };
 
-use crate::WAIT;
+use super::{
+    WAIT,
+    ChannelBuf,
+};
 
-use self::tic_tac_toe::Message;
+use common::tic_tac_toe::Message;
 
-pub mod tic_tac_toe;
-
+mod tic_tac_toe;
 enum Game {
     TicTacToe,
 }
@@ -31,16 +33,30 @@ impl Session {
     }
 
     // TODO move these to player
-    pub fn send(player: &Player, msg: Message) -> Result<(), SendError<Message>> {
-        player.tx.send(msg)?;
+    pub fn send(player: &Player, msg: Message) -> Result<(), SendError<ChannelBuf>> {
+        let bytes = bincode::serialize(dbg!(&msg)).unwrap();
+        player.tx.send(bytes)?;
         Ok(())
     }
 
-    pub fn broadcast(player1: &Player, player2: &Player, msg: Message) -> Result<(), SendError<Message>> {
+    pub fn broadcast(player1: &Player, player2: &Player, msg: Message) -> Result<(), SendError<ChannelBuf>> {
         Session::send(player1, msg.clone())?;
         Session::send(player2, msg.clone())?;
         Ok(())
     }
+}
+
+/* pub fn try_recv<'a, T: serde::de::Deserialize<'a>>(player: &Player) -> Result<T, TryRecvError> {
+    //player.rx.try_recv().and_then(|msg| Ok(bincode::deserialize(&msg).unwrap()))
+    let res = player.rx.try_recv();
+    match res {
+        Ok(msg) => Ok(bincode::deserialize::<'a, T>(&msg).unwrap()),
+        Err(_) => Err(TryRecvError::Empty),
+    }
+} */
+
+pub fn try_recv(player: &Player) -> Result<Message, TryRecvError> {
+    player.rx.try_recv().and_then(|msg| Ok(dbg!(bincode::deserialize(&msg).unwrap())))
 }
 
 pub struct Lobby {
@@ -50,13 +66,13 @@ pub struct Lobby {
 pub struct Player {
     thread: JoinHandle<()>,
     addr: SocketAddr,
-    tx: Sender<tic_tac_toe::Message>,
-    rx: Receiver<tic_tac_toe::Message>,
+    tx: Sender<Vec<u8>>,
+    rx: Receiver<Vec<u8>>,
     status: Status,
 }
 
 impl Player {
-    pub fn new(thread: JoinHandle<()>, addr: SocketAddr, tx: Sender<tic_tac_toe::Message>, rx: Receiver<tic_tac_toe::Message>) -> Self {
+    pub fn new(thread: JoinHandle<()>, addr: SocketAddr, tx: Sender<Vec<u8>>, rx: Receiver<Vec<u8>>) -> Self {
         Player {
             thread,
             addr,
@@ -90,10 +106,13 @@ impl Lobby {
                 let pair = Lobby::find_pair(&mut data);
                 if pair.is_some() {
                     // go through some process of selecting a game
-                    tic_tac_toe::begin(
-                        Arc::clone(&players), 
-                        Session::new(pair.unwrap())
-                    );
+                    let players2 = Arc::clone(&players);
+                    thread::spawn(move|| {
+                        tic_tac_toe::begin(
+                            players2,
+                            Session::new(pair.unwrap())
+                        );
+                    });
                 }
             }
         });

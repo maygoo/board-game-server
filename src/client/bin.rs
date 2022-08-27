@@ -7,55 +7,13 @@ use std::{
     sync::mpsc::{channel, Receiver},
 };
 
-// COPIED FROM SERVER CODE 
-// NEED TO FIND WAY TO REUSE
-use serde::{Serialize, Deserialize};
-#[derive(Clone, Serialize, Deserialize, Debug)]
-enum Message {
-    Preamble(Config),
-    WaitTurn,
-    YourTurn,
-    Move((Piece, usize, usize)),
-    InvalidMove(String),
-    GameOver(Piece),
-}
-#[derive(Clone, Serialize, Deserialize, Debug)]
-struct Config {
-    opponent: String,
-    piece: Piece,
-    boardsize: usize,
-}
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
-enum Piece {
-    Nought,
-    Cross,
-    Empty
-}
-impl std::fmt::Display for Piece {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::Nought => write!(f, "O"),
-            Self::Cross  => write!(f, "X"),
-            Self::Empty  => write!(f, " "),
-        }
-    }
-}
-const BUFF_SIZE: usize = 200; // in bytes/u8
-// END OF COPY
-
-struct State {
-    opponent: String,
-    piece: Piece,
-    board: Vec<Vec<Piece>>,
-    boardsize: usize,
-}
-
-const INSTRUCTIONS: &str = "
-  Wait until your turn then
-  enter two numbers, eg 1 2  
-  for your move. 1 1 starts  
-  at the the top left cell.
-";
+use common::tic_tac_toe::{
+    self,
+    Message,
+    ClientState,
+    Piece,
+    Board,
+};
 
 fn main() {
     // connect to the server
@@ -85,19 +43,13 @@ fn main() {
 
             // thread to handle the tcp connection
             stream.set_read_timeout(Some(Duration::from_millis(100))).unwrap();
-            // initialise dummy game state
-            let mut state = State {
-                opponent: "".to_string(),
-                piece: Piece::Empty,
-                board: vec![vec![Piece::Empty]],
-                boardsize: 0,
-            };
+            // initialise dummy state
+            let mut state = ClientState::new(String::new(), Piece::Empty, 0);
             loop {
-                let mut recv = [0 as u8; BUFF_SIZE];
+                let mut recv = [0 as u8; common::BUFF_SIZE];
                 match stream.read(&mut recv) {
                     Ok(size) if size > 0 => {
                         let msg: Message = bincode::deserialize(&recv).unwrap();
-                        println!("Received message: {msg:?}");
 
                         // better way to do this?
                         match play(msg, &mut state, &rx) {
@@ -119,15 +71,11 @@ fn main() {
     }
 }
 
-fn play(msg: Message, state: &mut State, rx: &Receiver<String>) -> Option<Message> {
+fn play(msg: Message, state: &mut ClientState, rx: &Receiver<String>) -> Option<Message> {
     match msg {
         Message::Preamble(config) => {
-            *state = State {
-                opponent: config.opponent,
-                piece: config.piece,
-                board: vec![vec![Piece::Empty; config.boardsize]; config.boardsize],
-                boardsize: config.boardsize,
-            };
+            *state = config;
+            state.board = Board::new(state.board.size);
 
             let order = match state.piece {
                 Piece::Cross => "fisrt",
@@ -136,12 +84,12 @@ fn play(msg: Message, state: &mut State, rx: &Receiver<String>) -> Option<Messag
             };
 
             println!("=====================");
-            println!("Tic Tac Toe");
+            println!("{}", tic_tac_toe::NAME);
             println!("Playing with {}", state.opponent);
             println!("=====================\n");
-            println!("Instructions{}", INSTRUCTIONS);
+            println!("Instructions{}", tic_tac_toe::INSTRUCTIONS);
             println!("You are player {}. You go {}.\n", state.piece, order);
-            print_board(&state.board);
+            print!("{}", state.board);
 
             None
         },
@@ -172,12 +120,12 @@ fn play(msg: Message, state: &mut State, rx: &Receiver<String>) -> Option<Messag
                     let y = y as usize; // for the following comparisons
                     match parse[1].iter().collect::<String>().parse::<usize>() {
                         //  validate y coord in match guard
-                        Ok(x) if x > 0 && x <= state.boardsize => {
+                        Ok(x) if x > 0 && x <= state.board.size => {
                             // less the offset for the decimal value, e.g. a:1, b:2, etc
                             // less 1 from y to account for zero-indexed board
-                            if y >= offset_lower && y <= offset_lower + state.boardsize {
+                            if y >= offset_lower && y <= offset_lower + state.board.size {
                                 return Some(Message::Move((state.piece.clone(), x-1, y-offset_lower)));
-                            } else if y >= offset_upper && x <= offset_upper + state.boardsize {
+                            } else if y >= offset_upper && x <= offset_upper + state.board.size {
                                 return Some(Message::Move((state.piece.clone(), x-1, y-offset_upper)));
                             }
                         },
@@ -191,8 +139,8 @@ fn play(msg: Message, state: &mut State, rx: &Receiver<String>) -> Option<Messag
         Message::Move((p, x, y)) => {
             // update board state
             // move has already been validated by server
-            state.board[y][x] = p;
-            print_board(&state.board);
+            state.board.place(x, y, p);
+            print!("{}", state.board);
             None
         },
         Message::InvalidMove(e) => {
@@ -208,33 +156,5 @@ fn play(msg: Message, state: &mut State, rx: &Receiver<String>) -> Option<Messag
             }
             None
         }
-    }
-}
-
-fn print_board(board: &Vec<Vec<Piece>>) {
-    // create the horizontal separator
-    // based on the board size
-    let sep = "-".repeat(board.len() * 2 - 1);
-
-    // ascii offset to convert numbers to letters
-    let offset = 65;
-
-    print!("  ");
-    for i in 1..=board.len() {
-        print!("{i} ");
-    }
-    print!("\n");
-
-    for (i, row) in board.iter().enumerate() {
-        if i > 0 { println!("  {}", sep) }
-
-        for (j, cell) in row.iter().enumerate() {
-            if j == 0 { print!("{} ", char::from((i+offset) as u8)) }
-            if j > 0 { print!("|") }
-
-            print!("{cell}");
-        }
-
-        println!("");
     }
 }
