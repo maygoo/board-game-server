@@ -1,6 +1,6 @@
 use std::{
     io::{self, prelude::*, stdout},
-    net::{TcpStream, Shutdown},
+    net::TcpStream,
     str,
     thread,
     time::Duration,
@@ -63,8 +63,7 @@ fn main() {
                 }
             }
 
-            stream.shutdown(Shutdown::Both).unwrap();
-            println!("Connection to {} closed.", &stream.peer_addr().unwrap());
+            println!("Connection lost");
         },
         Err(e) => {
             println!("Failed to connect: {}", e);
