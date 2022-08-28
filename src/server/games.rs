@@ -159,6 +159,7 @@ impl Lobby {
 
     fn print_connections(players: &Vec<Player>) {
         println!("Active players:");
+        if players.is_empty() { println!("  None"); }
         for player in players.iter() {
             println!("  {}", player.addr);
         }

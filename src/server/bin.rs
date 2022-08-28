@@ -4,7 +4,7 @@ use std::{
     io::prelude::*,
     time::Duration,
     sync::mpsc::channel,
-    net::{TcpListener, Shutdown, SocketAddr, TcpStream},
+    net::{TcpListener, SocketAddr, TcpStream},
 };
 
 mod games;
@@ -73,8 +73,6 @@ fn handle_connection(mut stream: TcpStream, lobby: &games::Lobby) {
                 _ => (),
             }
         }
-
-        stream.shutdown(Shutdown::Both).unwrap();
     });
 
     lobby.add_and_print_connections(games::Player::new(t, client, tx, rx));
