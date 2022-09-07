@@ -35,18 +35,6 @@ impl eframe::App for TemplateApp {
         // Tip: a good default choice is to just keep the `CentralPanel`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
 
-        #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Quit").clicked() {
-                        _frame.close();
-                    }
-                });
-            });
-        });
-
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             ui.heading("Side Panel");
 
@@ -85,6 +73,10 @@ impl eframe::App for TemplateApp {
                 "Source code."
             ));
             egui::warn_if_debug_build(ui);
+
+            ui.add_space(10.0);
+            ui.heading(common::tic_tac_toe::NAME);
+            ui.small(common::tic_tac_toe::INSTRUCTIONS);
         });
 
         if false {

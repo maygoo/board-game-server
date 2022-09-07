@@ -3,10 +3,12 @@
 mod app;
 pub use app::TemplateApp;
 
+//extern crate board_games;
+
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    eprintln!("Complile for wasm");
+    eprintln!("Compile for wasm");
 }
 
 // when compiling to web using trunk.

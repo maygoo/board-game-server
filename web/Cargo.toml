@@ -1,9 +1,14 @@
+# ideally we can move this config to the root Cargo.toml
+# but we need to wait for Trunk to be updated to recognise
+# different Cargo options, i.e. specifying the binary
+
 [package]
 name = "web"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+board-games = { path = ".." }
 egui = "0.19.0"
 eframe = "0.19.0"
 
