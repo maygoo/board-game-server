@@ -3,7 +3,6 @@
 mod app;
 pub use app::TemplateApp;
 
-//extern crate board_games;
 
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
