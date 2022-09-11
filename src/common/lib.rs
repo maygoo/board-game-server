@@ -1,4 +1,4 @@
-pub mod tic_tac_toe;
+// re-export bincode for client
+pub use bincode;
 
-// shared const values between server and client
-pub const BUFF_SIZE: usize = 200;
+pub mod tic_tac_toe;

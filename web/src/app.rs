@@ -7,7 +7,11 @@ use std::{
 };
 
 use wasm_bindgen::prelude::*;
+use gloo_net::websocket::{self, futures::WebSocket};
+use wasm_bindgen_futures::spawn_local;
+use futures::{SinkExt, StreamExt};
 
+use common::bincode;
 use common::tic_tac_toe::{
     ClientState,
     Piece,
@@ -27,16 +31,16 @@ extern {
 }
 
 #[cfg(debug_assertions)]
-const REMOTE_IP: &str = "127.0.0.1:3334";
+const REMOTE_IP: &str = "ws://127.0.0.1:3334";
 #[cfg(not(debug_assertions))]
-const REMOTE_IP: &str = "ec2-3-25-98-214.ap-southeast-2.compute.amazonaws.com:3334";
+const REMOTE_IP: &str = "ws://ec2-3-25-98-214.ap-southeast-2.compute.amazonaws.com:3334";
 
 pub struct TemplateApp {
     // Example stuff:
     remote_ip: String,
     value: f32,
     state: ClientState,
-    stream: Option<TcpStream>,
+    websocket: Option<WebSocket>,
 }
 
 impl Default for TemplateApp {
@@ -46,7 +50,7 @@ impl Default for TemplateApp {
             remote_ip: REMOTE_IP.to_owned(),
             value: 2.7,
             state: ClientState::new(String::new(), Piece::Empty, 0),
-            stream: None,
+            websocket: None,
         }
     }
 }
@@ -65,28 +69,8 @@ impl eframe::App for TemplateApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if self.stream.is_some() {
-            let mut stream = self.stream.as_ref().unwrap();
-
-            // non-blocking read
-            let mut recv = [0 as u8; common::BUFF_SIZE];
-            match stream.read(&mut recv) {
-                Ok(size) if size > 0 => {
-                    let msg: Message = bincode::deserialize(&recv).unwrap();
-
-                    // send message
-                    /* match play(msg, &mut state, &rx) {
-                        Some(msg) => { stream.write(&bincode::serialize(&msg).unwrap()).unwrap(); }
-                        None => (),
-                    } */
-                    log!("Incoming message: {:?}", msg);
-                },
-                Ok(_) => {
-                    log!("Connectedion closed");
-                    self.stream = None;
-                }, // connection is closed if size == 0
-                Err(_) => (), // ignore the timeout
-            }
+        if self.websocket.is_some() {
+            // read and write to the websocket
         }
 
         // Examples of how to create different panels and windows.
@@ -102,19 +86,20 @@ impl eframe::App for TemplateApp {
                 ui.text_edit_singleline(&mut self.remote_ip);
             });
 
-            if ui.button("join").clicked() && self.stream.is_none() {
-                self.stream = match TcpStream::connect(&self.remote_ip) {
-                //self.stream = match TcpStream::connect_timeout(&self.remote_ip.parse().unwrap(), Duration::from_millis(100)) {
-                    Ok(mut stream) => {
-                        log!("Connected!");
-                        //stream.set_nonblocking(true);
-                        Some(stream)
+            if ui.button("join").clicked() && self.websocket.is_none() {
+                let websocket = WebSocket::open(&self.remote_ip).ok();
+
+                let (mut write, mut read) = websocket.unwrap().split();
+
+                spawn_local(async move {
+                    write.send(websocket::Message::Bytes(bincode::serialize(&Message::WaitTurn).unwrap())).await.unwrap();
+                });
+
+                spawn_local(async move {
+                    while let Some(msg) = read.next().await {
+                        log!("{msg:?}");
                     }
-                    Err(e) => {
-                        log!("Unable to connect: {e}");
-                        None
-                    },
-                };
+                });
             }
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
