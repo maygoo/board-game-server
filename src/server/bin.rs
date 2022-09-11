@@ -1,7 +1,6 @@
 use std::{
     env,
     thread,
-    io::prelude::*,
     time::Duration,
     sync::mpsc::channel,
     net::{TcpListener, SocketAddr, TcpStream},
@@ -42,33 +41,57 @@ fn main() {
     };
 }
 
-fn handle_connection(mut stream: TcpStream, lobby: &games::Lobby) {
+fn handle_connection(stream: TcpStream, lobby: &games::Lobby) {
+    // convert stream to websocket
     let client = stream.peer_addr().unwrap();
-    println!("Connected to {client}");
+    let mut websocket = match tungstenite::accept(stream) {
+        Ok(ws) => {
+            println!("Connected to {client}");
+            ws
+        },
+        Err(e) => {
+            panic!("Error creating websocket for {client}. {e}");
+        }
+    };
+
+    // set underlying stream to nonblocking mode
+    // need to do this after the websocket handshake
+    websocket.get_mut().set_nonblocking(true).unwrap();
 
     // create channel pair for duplex communication
     let (tx_t, rx) = channel::<ChannelBuf>();
     let (tx, rx_t) = channel::<ChannelBuf>();
 
-    let t = thread::spawn(move|| {
-        let mut data = [0 as u8; common::BUFF_SIZE]; // 50 byte buffer
-        
-        // set a timeout on read so that read is nonblocking
-        // i.e. we can send without needing to read
-        stream.set_read_timeout(Some(WAIT)).unwrap_or_default();
-        while match stream.read(&mut data) {
-            Ok(size) if size > 0 => {
-                // send received data through channel to game controller
-                tx_t.send(data.to_vec()).unwrap();
-                true
-            },
-            Ok(_) => false, // connection is closed for sizes == 0
-            Err(_) => true, // continue because errors are timeout errors
-        } {
+    let t = thread::spawn(move|| {     
+        //client.set_nonblocking(true).unwrap();
+
+        loop {
+            match websocket.read_message() {
+                Ok(msg) if msg.is_binary() => {
+                    // send the data to through channel to the game controller
+                    tx_t.send(msg.into_data()).unwrap();
+                },
+                Ok(msg) => {
+                    if msg.is_text() {
+                        // not expecting text messages
+                        // print them out
+                        println!("Text msg received from {client}: {:?}", msg.to_text());
+                    } else if msg.is_close() {
+                        break;
+                    }
+                },
+                Err(tungstenite::Error::Io(_)) => (), // read timeout,
+                Err(e) => {
+                    // break on other errors
+                    println!("Error: {e}");
+                    break;
+                },
+            }
+
             // receive data through channel from game controller
             match rx_t.try_recv() {
                 Ok(send) => {
-                    stream.write(&send).unwrap();
+                    websocket.write_message(tungstenite::Message::binary(send)).unwrap();
                 },
                 _ => (),
             }

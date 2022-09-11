@@ -1,9 +1,7 @@
 use std::{
     io::{self, prelude::*, stdout},
-    net::TcpStream,
     str,
     thread,
-    time::Duration,
     sync::mpsc::{channel, Receiver},
 };
 
@@ -19,13 +17,13 @@ use common::tic_tac_toe::{
 fn main() {
     // connect to the server
     #[cfg(debug_assertions)]
-    const REMOTE_IP: &str = "127.0.0.1:3334";
+    const REMOTE_IP: &str = "ws://127.0.0.1:3334";
     #[cfg(not(debug_assertions))]
-    const REMOTE_IP: &str = "ec2-3-25-98-214.ap-southeast-2.compute.amazonaws.com:3334";
+    const REMOTE_IP: &str = "ws://ec2-3-25-98-214.ap-southeast-2.compute.amazonaws.com:3334";
 
-    match TcpStream::connect(REMOTE_IP) {
-        Ok(mut stream) => {
-            println!("Successfully connected to {}.", &stream.peer_addr().unwrap());
+    match tungstenite::connect(REMOTE_IP) {
+        Ok((mut socket, _)) => {
+            println!("Successfully connected to {REMOTE_IP}.");
 
             // create two threads, one to block on io reading from stdin
             // the other to handle the TcpStream and sending/receiving
@@ -42,24 +40,38 @@ fn main() {
                 }
             });
 
-            // thread to handle the tcp connection
-            stream.set_read_timeout(Some(Duration::from_millis(100))).unwrap();
+            // set underlying stream to nonblocking mode
+            match socket.get_mut() {
+                tungstenite::stream::MaybeTlsStream::Plain(stream) => stream.set_nonblocking(true).unwrap(),
+                _ => unimplemented!(),
+            }
+
             // initialise dummy state
             let mut state = ClientState::new(String::new(), Piece::Empty, 0);
             loop {
-                let mut recv = [0 as u8; common::BUFF_SIZE];
-                match stream.read(&mut recv) {
-                    Ok(size) if size > 0 => {
-                        let msg: Message = bincode::deserialize(&recv).unwrap();
+                match socket.read_message() {
+                    Ok(msg) if msg.is_binary() => {
+                        let msg: Message = bincode::deserialize(&msg.into_data()).unwrap();
 
                         // better way to do this?
                         match play(msg, &mut state, &rx) {
-                            Some(msg) => { stream.write(&bincode::serialize(&msg).unwrap()).unwrap(); }
+                            //Some(msg) => { stream.write(&bincode::serialize(&msg).unwrap()).unwrap(); }
+                            Some(msg) => socket.write_message(tungstenite::Message::binary(bincode::serialize(&msg).unwrap())).unwrap(),
                             None => (),
                         }
                     },
-                    Ok(_) => break, // connection is closed if size == 0
-                    _ => (),
+                    Ok(msg) => {
+                        if msg.is_close() {
+                            break; // exit the thread if close msg received
+                        } else if msg.is_text() {
+                            println!("text msg received: {msg}");
+                        }
+                    },
+                    Err(tungstenite::Error::Io(_)) => continue, // read timeout
+                    Err(e) => {
+                        println!("{e}");
+                        break;
+                    },
                 }
             }
 
