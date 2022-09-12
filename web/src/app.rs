@@ -1,21 +1,17 @@
-use std::{
-    sync::mpsc::{channel, Sender, Receiver},
-};
-
+use std::fmt::Display;
+use std::sync::mpsc::{channel, Sender, Receiver};
 use wasm_bindgen::prelude::*;
 use gloo_net::websocket::futures::WebSocket;
 use gloo_net::websocket::Message as WsMessage;
 use wasm_bindgen_futures::spawn_local;
 use futures::{SinkExt, StreamExt};
 
-use common::{
-    WAIT_MS,
-    ChannelBuf,
-    tic_tac_toe::{
-        ClientState,
-        Piece,
-        Message,
-    },
+use common::{WAIT_MS, ChannelBuf};
+use common::tic_tac_toe::{
+    ClientState,
+    Piece,
+    Message,
+    Board,
 };
 
 /// Defines a `println!`-esque macro that binds to js `console.log`
@@ -38,9 +34,9 @@ const REMOTE_IP: &str = "ws://ec2-3-25-98-214.ap-southeast-2.compute.amazonaws.c
 pub struct TemplateApp {
     // Example stuff:
     remote_ip: String,
-    value: f32,
     state: ClientState,
-    worker: Option<Worker>
+    worker: Option<Worker>,
+    turn: bool,
 }
 
 struct Worker {
@@ -77,6 +73,7 @@ impl Worker {
                 // check for any incoming messages on the channel
                 match rx_t.try_recv() {
                     Ok(msg) => {
+                        log!("woop woop msg received on channel");
                         // forward message through the websocket
                         ws.send(WsMessage::Bytes(msg)).await.unwrap();
                     },
@@ -95,11 +92,10 @@ impl Worker {
 impl Default for TemplateApp {
     fn default() -> Self {
         Self {
-            // Example stuff:
             remote_ip: REMOTE_IP.to_owned(),
-            value: 2.7,
             state: ClientState::new(String::new(), Piece::Empty, 0),
             worker: None,
+            turn: false,
         }
     }
 }
@@ -118,17 +114,6 @@ impl eframe::App for TemplateApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // consume messages from the channel
-        if self.worker.is_some() {
-            match self.worker.as_ref().unwrap().rx.try_recv() {
-                Ok(msg) => {
-                    let msg: Message = msg.into();
-                    log!("{msg:?}");
-                },
-                Err(_) => (),
-            }
-        }
-
         // Examples of how to create different panels and windows.
         // Pick whichever suits you.
         // Tip: a good default choice is to just keep the `CentralPanel`.
@@ -189,26 +174,89 @@ impl eframe::App for TemplateApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
 
-            ui.heading("eframe template");
-            ui.hyperlink("https://github.com/emilk/eframe_template");
+            ui.heading("Board Games");
             ui.add(egui::github_link_file!(
-                "https://github.com/emilk/eframe_template/blob/master/",
-                "Source code."
+                "https://github.com/maygoo/board-games-rust/tree/gui/web/",
+                "Project source"
             ));
             egui::warn_if_debug_build(ui);
 
-            ui.add_space(10.0);
-            ui.heading(common::tic_tac_toe::NAME);
-            ui.small(common::tic_tac_toe::INSTRUCTIONS);
-        });
+            ui.separator();
 
-        if false {
-            egui::Window::new("Window").show(ctx, |ui| {
-                ui.label("Windows can be moved by dragging them.");
-                ui.label("They are automatically sized based on contents.");
-                ui.label("You can turn on resizing and scrolling if you like.");
-                ui.label("You would normally chose either panels OR windows.");
-            });
-        }
+            if self.worker.is_none() {
+                ui.heading("Join a game");
+            } else {
+                ui.heading(common::tic_tac_toe::NAME);
+                ui.label(common::tic_tac_toe::INSTRUCTIONS);
+
+                ui.label(format!{"State: {:?}", self.state});
+
+                // consume messages from the channel
+                match self.worker.as_ref().unwrap().rx.try_recv() {
+                    Ok(msg) => {
+                        match msg.into() {
+                            Message::Preamble(config) => {
+                                self.state = config;
+                                self.state.board = Board::new(self.state.board.size);
+                            },
+                            Message::WaitTurn => {
+                                log!("waiting for your turn");
+                                self.turn = false;
+                            },
+                            Message::YourTurn => {
+                                self.turn = true;
+                            },
+                            Message::Move((p, x, y)) => {
+                                self.state.board.place(p, x, y)
+                            },
+                            Message::InvalidMove(e) => {
+                                log!("{e}");
+                                self.turn = true;
+                            },
+                            Message::GameOver(end) => {
+                            },
+                        }
+                    },
+                    Err(_) => (),
+                }
+
+                // display board
+                match display_board(ui, &self.state.board, self.turn) {
+                    Some((x, y)) => {
+                        self.turn = false;
+    
+                        self.worker
+                            .as_ref()
+                            .unwrap()
+                            .tx.send(
+                                Message::Move(
+                                    (self.state.piece.clone(),
+                                    x,
+                                    y))
+                                .into())
+                            .unwrap();
+                    },
+                    None => (),
+                }
+            }
+        });
     }
+}
+
+fn display_board(ui: &mut egui::Ui, board: &Board, clickable: bool) -> Option<(usize, usize)> {
+    let mut turn = None;
+    for (y, row) in board.iter().enumerate() {
+        ui.horizontal(|ui| {
+            for (x, cell) in row.iter().enumerate() {
+                if ui.add_sized([20.0, 20.0], egui::Button::new(cell.to_string())).clicked() && clickable {
+                    log!("clicked pos: {x},{y}");
+                    turn = Some((x, y));
+                }
+            }
+        });
+    }
+
+    // validate turn here then return turn if valid
+    
+    turn
 }
