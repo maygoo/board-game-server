@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use wasm_bindgen::prelude::*;
 use gloo_net::websocket::futures::WebSocket;
@@ -13,6 +12,9 @@ use common::tic_tac_toe::{
     Message,
     Board,
 };
+
+mod style;
+use style::Style;
 
 /// Defines a `println!`-esque macro that binds to js `console.log`
 macro_rules! log {
@@ -31,7 +33,7 @@ const REMOTE_IP: &str = "ws://127.0.0.1:3334";
 #[cfg(not(debug_assertions))]
 const REMOTE_IP: &str = "ws://ec2-3-25-98-214.ap-southeast-2.compute.amazonaws.com:3334";
 
-pub struct TemplateApp {
+pub struct WebApp {
     // Example stuff:
     remote_ip: String,
     state: ClientState,
@@ -89,7 +91,7 @@ impl Worker {
     }
 }
 
-impl Default for TemplateApp {
+impl Default for WebApp {
     fn default() -> Self {
         Self {
             remote_ip: REMOTE_IP.to_owned(),
@@ -100,7 +102,7 @@ impl Default for TemplateApp {
     }
 }
 
-impl TemplateApp {
+impl WebApp {
     /// Called once before the first frame.
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customized the look at feel of egui using
@@ -110,21 +112,19 @@ impl TemplateApp {
     }
 }
 
-impl eframe::App for TemplateApp {
+impl eframe::App for WebApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Examples of how to create different panels and windows.
-        // Pick whichever suits you.
-        // Tip: a good default choice is to just keep the `CentralPanel`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
+        ctx.set_style(Style::build_style((*ctx.style()).clone()));
 
         egui::SidePanel::left("side_panel").show(ctx, |ui| {
             ui.heading("Lobby");
 
             ui.horizontal(|ui| {
                 ui.label("Server: ");
-                ui.text_edit_singleline(&mut self.remote_ip);
+                ui.add(egui::widgets::TextEdit::singleline(&mut self.remote_ip)
+                    .text_color(Style::CORAL));
             });
 
             if ui.button("join").clicked() && self.worker.is_none() {
@@ -133,26 +133,6 @@ impl eframe::App for TemplateApp {
                         self.worker = Some(Worker::new(ws));
                     },
                     Err(_) => (),
-                }
-            }
-
-            if self.worker.is_some() {
-                ui.label("connected");
-
-                if ui.button("send YouTurn message").clicked() {
-                    self.worker
-                        .as_ref()
-                        .unwrap()
-                        .tx.send(
-                            Message::YourTurn.into()).unwrap();
-                }
-
-                if ui.button("send WaitTurn message").clicked() {
-                    self.worker
-                        .as_ref()
-                        .unwrap()
-                        .tx.send(
-                            Message::YourTurn.into()).unwrap();
                 }
             }
 
@@ -187,8 +167,8 @@ impl eframe::App for TemplateApp {
                 ui.heading("Join a game");
             } else {
                 ui.heading(common::tic_tac_toe::NAME);
-                ui.label(common::tic_tac_toe::INSTRUCTIONS);
 
+                #[cfg(debug_assertions)]
                 ui.label(format!{"State: {:?}", self.state});
 
                 // consume messages from the channel
@@ -214,6 +194,8 @@ impl eframe::App for TemplateApp {
                                 self.turn = true;
                             },
                             Message::GameOver(end) => {
+                                log!("{end:?}");
+                                // display window popup
                             },
                         }
                     },
