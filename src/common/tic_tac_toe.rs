@@ -1,4 +1,3 @@
-use std::fmt;
 use serde::{Serialize, Deserialize};
 
 #[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
@@ -100,15 +99,15 @@ impl Board {
     // forefully place the piece on the board
     // useful for the client because the move
     // is already validated by the server
-    pub fn place(&mut self, x: usize, y: usize, p: Piece) {
+    pub fn place(&mut self, p: Piece, x: usize, y: usize) {
         self.grid[y][x] = p;
     }
 
-    pub fn try_place(&mut self, x: usize, y:usize, p: Piece) -> Result<(Piece, usize, usize), String> {
+    pub fn try_place(&mut self, p: Piece, x: usize, y:usize) -> Result<(Piece, usize, usize), String> {
         // check if cell is empty then do move
         match &mut self.grid[y][x] {
             Piece::Empty => {
-                self.place(x, y, p.clone());
+                self.place(p.clone(), x, y);
                 Ok((p, x, y))
             }
             p => Err(format!("{} {} already has a {p} on it! Enter another move", (y + 65) as u8 as char, x+1)), // quick convert idxs to game coords
@@ -164,10 +163,14 @@ impl Board {
             .map(|row| row.contains(&Piece::Empty))
             .any(|p| p)
     }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, Vec<Piece>> {
+        self.grid.iter()
+    }
 }
 
-impl fmt::Display for Board {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for Board {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut out = String::new();
 
         // create the horizontal separator

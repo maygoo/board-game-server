@@ -63,7 +63,7 @@ pub fn begin(players: Arc<Mutex<Vec<Player>>>, mut session: super::Session) {
                     Turn::TurnWait => {
                         match super::try_recv(current_player) {
                             Ok(Message::Move((_, x, y))) => {
-                                match state.board.try_place(x, y, dbg!(state.current_player.clone())) {
+                                match state.board.try_place(dbg!(state.current_player.clone()), x, y) {
                                     Ok(m) => {
                                         Session::broadcast(current_player, next_player, Message::Move(m)).unwrap();
                                         match state.board.check_victory(state.current_player.clone()) {

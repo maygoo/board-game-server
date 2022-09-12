@@ -150,7 +150,7 @@ fn play(msg: Message, state: &mut ClientState, rx: &Receiver<String>) -> Option<
         Message::Move((p, x, y)) => {
             // update board state
             // move has already been validated by server
-            state.board.place(x, y, p);
+            state.board.place(p, x, y);
             print!("{}", state.board);
             None
         },
