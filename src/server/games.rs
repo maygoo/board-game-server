@@ -34,8 +34,7 @@ impl Session {
 
     // TODO move these to player
     pub fn send(player: &Player, msg: Message) -> Result<(), SendError<ChannelBuf>> {
-        let bytes = bincode::serialize(dbg!(&msg)).unwrap();
-        player.tx.send(bytes)?;
+        player.tx.send(dbg!(msg).into())?;
         Ok(())
     }
 
@@ -56,7 +55,7 @@ impl Session {
 } */
 
 pub fn try_recv(player: &Player) -> Result<Message, TryRecvError> {
-    player.rx.try_recv().and_then(|msg| Ok(dbg!(bincode::deserialize(&msg).unwrap())))
+    player.rx.try_recv().and_then(|msg| Ok(dbg!(msg.into())))
 }
 
 pub struct Lobby {

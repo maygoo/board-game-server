@@ -21,6 +21,18 @@ pub enum Message {
     GameOver(End),
 }
 
+impl From<Vec<u8>> for Message {
+    fn from(bytes: Vec<u8>) -> Self {
+        bincode::deserialize(&bytes).unwrap()
+    }
+}
+
+impl From<Message> for Vec<u8> {
+    fn from(message: Message) -> Self {
+        bincode::serialize(&message).unwrap()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum End {
     Victory(Piece),

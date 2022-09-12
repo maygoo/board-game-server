@@ -1,16 +1,13 @@
 use std::{
     env,
     thread,
-    time::Duration,
     sync::mpsc::channel,
     net::{TcpListener, SocketAddr, TcpStream},
 };
 
+use common::{WAIT, ChannelBuf};
+
 mod games;
-
-type ChannelBuf = Vec<u8>;
-
-const WAIT: Duration = Duration::from_millis(100);
 
 fn main() {
     // initialise server with default binding 0.0.0.0:3334

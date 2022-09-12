@@ -3,14 +3,13 @@ use std::{
 };
 
 use wasm_bindgen::prelude::*;
-use gloo_net::websocket::{self, futures::WebSocket};
+use gloo_net::websocket::futures::WebSocket;
 use gloo_net::websocket::Message as WsMessage;
 use wasm_bindgen_futures::spawn_local;
 use futures::{SinkExt, StreamExt};
 
 use common::{
-    bincode,
-    WAIT,
+    WAIT_MS,
     ChannelBuf,
     tic_tac_toe::{
         ClientState,
@@ -59,7 +58,7 @@ impl Worker {
 
             loop {
                 // should equate to a thread::sleep
-                gloo_timers::future::TimeoutFuture::new(WAIT.as_millis() as u32).await;
+                gloo_timers::future::TimeoutFuture::new(WAIT_MS).await;
 
                 // check for any incoming messages on the websocket
                 match futures::poll!(ws.next()) {
@@ -119,17 +118,16 @@ impl eframe::App for TemplateApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        /* // second, check for 
-                // check for incoming message from the channel
-                // forward messages through the websocket
-                match rx_t.try_recv() {
-                    Ok(msg) => {
-                        write.send(websocket::Message::Bytes(bincode::serialize(&msg).unwrap())).await.unwrap();
-                    },
-                    Err(_) => (),
-                }
+        // consume messages from the channel
+        if self.worker.is_some() {
+            match self.worker.as_ref().unwrap().rx.try_recv() {
+                Ok(msg) => {
+                    let msg: Message = msg.into();
+                    log!("{msg:?}");
+                },
+                Err(_) => (),
             }
-        }); */
+        }
 
         // Examples of how to create different panels and windows.
         // Pick whichever suits you.
@@ -161,7 +159,7 @@ impl eframe::App for TemplateApp {
                         .as_ref()
                         .unwrap()
                         .tx.send(
-                            bincode::serialize(&Message::YourTurn).unwrap()).unwrap();
+                            Message::YourTurn.into()).unwrap();
                 }
 
                 if ui.button("send WaitTurn message").clicked() {
@@ -169,7 +167,7 @@ impl eframe::App for TemplateApp {
                         .as_ref()
                         .unwrap()
                         .tx.send(
-                            bincode::serialize(&Message::WaitTurn).unwrap()).unwrap();
+                            Message::YourTurn.into()).unwrap();
                 }
             }
 

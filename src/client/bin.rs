@@ -51,12 +51,11 @@ fn main() {
             loop {
                 match socket.read_message() {
                     Ok(msg) if msg.is_binary() => {
-                        let msg: Message = bincode::deserialize(&msg.into_data()).unwrap();
+                        let msg: Message = msg.into_data().into();
 
                         // better way to do this?
                         match play(msg, &mut state, &rx) {
-                            //Some(msg) => { stream.write(&bincode::serialize(&msg).unwrap()).unwrap(); }
-                            Some(msg) => socket.write_message(tungstenite::Message::binary(bincode::serialize(&msg).unwrap())).unwrap(),
+                            Some(msg) => socket.write_message(tungstenite::Message::binary(msg)).unwrap(),
                             None => (),
                         }
                     },
