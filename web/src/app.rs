@@ -1,21 +1,22 @@
 use std::{
-    thread,
-    io::prelude::*,
-    net::TcpStream,
     sync::mpsc::{channel, Sender, Receiver},
-    time::Duration,
 };
 
 use wasm_bindgen::prelude::*;
 use gloo_net::websocket::{self, futures::WebSocket};
+use gloo_net::websocket::Message as WsMessage;
 use wasm_bindgen_futures::spawn_local;
 use futures::{SinkExt, StreamExt};
 
-use common::bincode;
-use common::tic_tac_toe::{
-    ClientState,
-    Piece,
-    Message,
+use common::{
+    bincode,
+    WAIT,
+    ChannelBuf,
+    tic_tac_toe::{
+        ClientState,
+        Piece,
+        Message,
+    },
 };
 
 /// Defines a `println!`-esque macro that binds to js `console.log`
@@ -40,7 +41,56 @@ pub struct TemplateApp {
     remote_ip: String,
     value: f32,
     state: ClientState,
-    websocket: Option<WebSocket>,
+    worker: Option<Worker>
+}
+
+struct Worker {
+    tx: Sender<ChannelBuf>,
+    rx: Receiver<ChannelBuf>,
+}
+
+impl Worker {
+    pub fn new(mut ws: WebSocket) -> Self {
+        let (tx_t, rx) = channel::<ChannelBuf>();
+        let (tx, rx_t) = channel::<ChannelBuf>();
+        
+        spawn_local(async move {
+            log!("Connected to websocket");
+
+            loop {
+                // should equate to a thread::sleep
+                gloo_timers::future::TimeoutFuture::new(WAIT.as_millis() as u32).await;
+
+                // check for any incoming messages on the websocket
+                match futures::poll!(ws.next()) {
+                    futures::task::Poll::Ready(
+                        Some(
+                        Ok(
+                        WsMessage::Bytes(bytes)
+                    ))) => {
+                        // forward message through the channel
+                        log!("msg: {bytes:?}");
+                        tx_t.send(bytes).unwrap();
+                    },
+                    _ => (),
+                }
+
+                // check for any incoming messages on the channel
+                match rx_t.try_recv() {
+                    Ok(msg) => {
+                        // forward message through the websocket
+                        ws.send(WsMessage::Bytes(msg)).await.unwrap();
+                    },
+                    _ => (),
+                }
+            }
+        });
+
+        Worker {
+            tx,
+            rx,
+        }
+    }
 }
 
 impl Default for TemplateApp {
@@ -50,14 +100,14 @@ impl Default for TemplateApp {
             remote_ip: REMOTE_IP.to_owned(),
             value: 2.7,
             state: ClientState::new(String::new(), Piece::Empty, 0),
-            websocket: None,
+            worker: None,
         }
     }
 }
 
 impl TemplateApp {
     /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customized the look at feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
@@ -69,9 +119,17 @@ impl eframe::App for TemplateApp {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if self.websocket.is_some() {
-            // read and write to the websocket
-        }
+        /* // second, check for 
+                // check for incoming message from the channel
+                // forward messages through the websocket
+                match rx_t.try_recv() {
+                    Ok(msg) => {
+                        write.send(websocket::Message::Bytes(bincode::serialize(&msg).unwrap())).await.unwrap();
+                    },
+                    Err(_) => (),
+                }
+            }
+        }); */
 
         // Examples of how to create different panels and windows.
         // Pick whichever suits you.
@@ -86,20 +144,33 @@ impl eframe::App for TemplateApp {
                 ui.text_edit_singleline(&mut self.remote_ip);
             });
 
-            if ui.button("join").clicked() && self.websocket.is_none() {
-                let websocket = WebSocket::open(&self.remote_ip).ok();
+            if ui.button("join").clicked() && self.worker.is_none() {
+                match WebSocket::open(&self.remote_ip) {
+                    Ok(ws) => {
+                        self.worker = Some(Worker::new(ws));
+                    },
+                    Err(_) => (),
+                }
+            }
 
-                let (mut write, mut read) = websocket.unwrap().split();
+            if self.worker.is_some() {
+                ui.label("connected");
 
-                spawn_local(async move {
-                    write.send(websocket::Message::Bytes(bincode::serialize(&Message::WaitTurn).unwrap())).await.unwrap();
-                });
+                if ui.button("send YouTurn message").clicked() {
+                    self.worker
+                        .as_ref()
+                        .unwrap()
+                        .tx.send(
+                            bincode::serialize(&Message::YourTurn).unwrap()).unwrap();
+                }
 
-                spawn_local(async move {
-                    while let Some(msg) = read.next().await {
-                        log!("{msg:?}");
-                    }
-                });
+                if ui.button("send WaitTurn message").clicked() {
+                    self.worker
+                        .as_ref()
+                        .unwrap()
+                        .tx.send(
+                            bincode::serialize(&Message::WaitTurn).unwrap()).unwrap();
+                }
             }
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {

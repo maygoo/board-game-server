@@ -18,7 +18,8 @@ console_error_panic_hook = "0.1.6"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 futures = "0.3"
-gloo-net = { version = "0.2", features = ["websocket"]}
+gloo-net = { version = "0.2", features = ["websocket"] }
+gloo-timers = { version = "0.2", features = ["futures"] }
 
 
 [profile.release]
