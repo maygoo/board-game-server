@@ -1,4 +1,7 @@
-name: Build and Deploy to Github Pages
+name: Web
+
+# builds the static page with trunk
+# and deploys to github pages
 
 on:
   push:

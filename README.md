@@ -41,6 +41,6 @@ To run an instance of the web client run:
 trunk serve --release
 ```
 
-and visit [127.0.0.1:8080](127.0.0.1:8080).
+and visit [127.0.0.1](https://127.0.0.1:8080).
 
 Omit the `--release` flag when running the client if you want to connect to a local server, otherwise the client will connect to my public instance of the server which is currently running on an ec2 instance.
