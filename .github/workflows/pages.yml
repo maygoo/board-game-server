@@ -27,8 +27,11 @@ jobs:
         uses: actions/configure-pages@v2
       - name: Get Trunk
         run: wget -qO- https://github.com/thedodd/trunk/releases/download/v0.16.0/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+      - name: Add WASM target
+        run: rustup target add wasm32-unknown-unknown
       - name: Build with Trunk
-        run: trunk build --release
+        # add repository name as url directory for relative pathing for assets
+        run: ./trunk build --release --public-url=${{ github.event.repository.name }}
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
