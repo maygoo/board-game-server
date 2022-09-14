@@ -1,13 +1,5 @@
 use serde::{Serialize, Deserialize};
 
-#[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
-pub enum Turn {
-    Begin,
-    TurnStart,
-    TurnWait,
-    End,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {
     Preamble(ClientState),
@@ -71,6 +63,14 @@ pub struct ClientState {
     pub turn: Turn,
     pub opponent: String,
     pub piece: Piece,
+}
+
+#[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
+pub enum Turn {
+    Begin,
+    TurnStart,
+    TurnWait,
+    End,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

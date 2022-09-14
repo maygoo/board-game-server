@@ -1,8 +1,22 @@
 #![warn(clippy::all, rust_2018_idioms)]
 
+use wasm_bindgen::prelude::*;
+
 mod app;
 pub use app::WebApp;
 
+/// Defines a `println!`-esque macro that binds to js `console.log`
+#[macro_export]
+macro_rules! log {
+    ($($t:tt)*) => (crate::log_js(&format_args!($($t)*).to_string()))
+}
+
+#[wasm_bindgen]
+extern {
+    /// bind to the js function `console.log`
+    #[wasm_bindgen(js_namespace = console, js_name = log)]
+    fn log_js(s: &str);
+}
 
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
@@ -21,7 +35,7 @@ fn main() {
 
     let web_options = eframe::WebOptions::default();
     eframe::start_web(
-        "the_canvas_id", // hardcode it
+        "ce7bccc0-da54-48af-a0ee-142ef8570fe5", // hardcode it
         web_options,
         Box::new(|cc| Box::new(WebApp::new(cc))),
     )
