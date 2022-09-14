@@ -3,7 +3,7 @@
 [![Rust](https://github.com/maygoo/board-games-rust/actions/workflows/rust.yml/badge.svg)](https://github.com/maygoo/board-games-rust/actions/workflows/rust.yml)
 [![Pages](https://github.com/maygoo/board-games-rust/actions/workflows/pages.yml/badge.svg)](https://maygoo.github.io/board-games-rust/)
 
-Small project to create a websocket server to facilitate online gameplay of various board games. Currently there is a cli client which connected to the server to play tic tac toe. There is also a static web app as an alternative to the command line client, it is built using WASM and [egui](https://github.com/emilk/egui) and then deployed to a github page [here](https://maygoo.github.io/board-games-rust/).
+Small project to create a websocket server to facilitate online gameplay of various board games. Currently there is a cli client which connects to the server to play tic tac toe. There is also a static web app as an alternative to the cli client, it is built using WASM and [egui](https://github.com/emilk/egui) and then deployed to [github pages](https://maygoo.github.io/board-games-rust/).
 
 ## How to Play
 
