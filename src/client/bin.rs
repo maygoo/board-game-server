@@ -15,13 +15,9 @@ use common::tic_tac_toe::{
 };
 
 fn main() {
-    // connect to the server
-    #[cfg(debug_assertions)]
-    const REMOTE_IP: &str = "ws://127.0.0.1:3334";
-    #[cfg(not(debug_assertions))]
-    const REMOTE_IP: &str = "ws://ec2-3-25-98-214.ap-southeast-2.compute.amazonaws.com:3334";
+    let ip = format!("wss://{common::REMOTE_IP}:{common::REMOTE_PORT}");
 
-    match tungstenite::connect(REMOTE_IP) {
+    match tungstenite::connect(ip) {
         Ok((mut socket, _)) => {
             println!("Successfully connected to {REMOTE_IP}.");
 

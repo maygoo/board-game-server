@@ -3,7 +3,9 @@ use std::{
     thread,
     sync::mpsc::channel,
     net::{TcpListener, SocketAddr, TcpStream},
+    fs::File, io::Read,
 };
+use native_tls::{Identity, TlsAcceptor, TlsStream};
 
 use common::{WAIT, ChannelBuf};
 
@@ -12,9 +14,8 @@ mod games;
 fn main() {
     // initialise server with default binding 0.0.0.0:3334
     const DEFAULT_IP: [u8; 4] = [0,0,0,0];
-    const DEFAULT_PORT: u16 = 3334;
     // check command line args for port
-    let port: u16 = env::args().collect::<Vec<String>>().get(1).and_then(|a| a.parse().ok()).unwrap_or(DEFAULT_PORT);
+    let port: u16 = env::args().collect::<Vec<String>>().get(1).and_then(|a| a.parse().ok()).unwrap_or(common::REMOTE_PORT);
     let addr = SocketAddr::from((DEFAULT_IP, port));
 
     // create shared vector for list of active connections
@@ -24,12 +25,27 @@ fn main() {
     // start game
     lobby.begin_game();
 
+    let mut file = File::open("tls/keystore.pkcs").expect("Needs keys");
+    let mut identity = vec![];
+    file.read_to_end(&mut identity).unwrap();
+    let identity = Identity::from_pkcs12(&identity, "").unwrap();
+
     match TcpListener::bind(addr) {
         Ok(listener) => {
             println!("Server listening on {}", listener.local_addr().unwrap());
+            println!("promoting to tls");
+
+            let acceptor = TlsAcceptor::new(identity).unwrap();
+            //let acceptor = Arc::new(acceptor);
+
             for stream in listener.incoming() {
                 match stream {
-                    Ok(stream) => handle_connection(stream, &lobby),
+                    Ok(stream) => {
+                        match acceptor.accept(stream) {
+                            Ok(stream) => handle_connection(stream, &lobby),
+                            Err(e) => eprintln!("Incoming connection not using ssl. {e}")
+                        };
+                    },
                     Err(e) => eprintln!("Unable to connect. {e}"),
                 }
             }
@@ -38,22 +54,23 @@ fn main() {
     };
 }
 
-fn handle_connection(stream: TcpStream, lobby: &games::Lobby) {
+fn handle_connection(stream: TlsStream<TcpStream>, lobby: &games::Lobby) {
     // convert stream to websocket
-    let client = stream.peer_addr().unwrap();
+    let client = stream.get_ref().peer_addr().unwrap();
     let mut websocket = match tungstenite::accept(stream) {
         Ok(ws) => {
             println!("Connected to {client}");
             ws
         },
         Err(e) => {
-            panic!("Error creating websocket for {client}. {e}");
+            eprintln!("Error creating websocket for {client}. {e}");
+            return;
         }
     };
 
-    // set underlying stream to nonblocking mode
+    // set inner tcpstream to nonblocking mode
     // need to do this after the websocket handshake
-    websocket.get_mut().set_nonblocking(true).unwrap();
+    websocket.get_mut().get_mut().set_nonblocking(true).unwrap();
 
     // create channel pair for duplex communication
     let (tx_t, rx) = channel::<ChannelBuf>();

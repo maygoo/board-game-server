@@ -10,3 +10,14 @@ pub const WAIT_MS: u32 = 100;
 /// while waiting for other threads to unlock shared
 /// resources. Value defined in ms by `common::WAIT_MS`.
 pub const WAIT: Duration = Duration::from_millis(WAIT_MS as u64);
+
+/// Remote IP for the client to connect to by default.
+/// Changes from local to remotebased on `--release` or `--debug` flags.
+#[cfg(debug_assertions)]
+pub const REMOTE_IP: &str = "127.0.0.1";
+#[cfg(not(debug_assertions))]
+pub const REMOTE_IP: &str = "ws.gh.maygoo.au";
+
+/// Remote port for the server to use and the client
+/// to connect to by default.
+pub const REMOTE_PORT: u16 = 3334;

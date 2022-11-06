@@ -15,11 +15,6 @@ use style::Style;
 mod worker;
 use worker::Worker;
 
-#[cfg(debug_assertions)]
-const REMOTE_IP: &str = "ws://127.0.0.1:3334";
-#[cfg(not(debug_assertions))]
-const REMOTE_IP: &str = "ws://ec2-3-25-98-214.ap-southeast-2.compute.amazonaws.com:3334";
-
 struct Info {
     pub text: String,
     locked: bool,
@@ -62,7 +57,7 @@ pub struct WebApp {
 impl Default for WebApp {
     fn default() -> Self {
         Self {
-            remote_ip: REMOTE_IP.to_owned(),
+            remote_ip: common::REMOTE_IP.to_owned(),
             state: ClientState::new(String::new(), Piece::Empty, 0),
             worker: None,
             info: Info::new(),
@@ -105,7 +100,8 @@ impl eframe::App for WebApp {
                         .text_color(Style::CORAL));
 
                     if ui.button("Connect to the server").clicked() && self.worker.is_none() {
-                        match WebSocket::open(&self.remote_ip) {
+                        let ip = format!("wss://{}:{}", &self.remote_ip, common::REMOTE_PORT);
+                        match WebSocket::open(&ip) {
                             Ok(ws) => {
                                 self.worker = Some(Worker::new(ws));
                             },

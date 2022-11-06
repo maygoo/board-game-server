@@ -26,13 +26,13 @@ If you want to connect to the server and play some games then read [here](#how-t
 To run an instance of the server:
 
 ```bash
-cargo run --bin server --release
+cargo run --bin server --release --features native
 ```
 
 To run an instance of the cli client:
 
 ```bash
-cargo run --bin client --release
+cargo run --bin client --release --features native
 ```
 
 To run an instance of the web client run:
