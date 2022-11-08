@@ -81,19 +81,46 @@ impl eframe::App for WebApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.set_style(Style::build_style((*ctx.style()).clone()));
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        #[cfg(debug_assertions)]
+        ctx.set_debug_on_hover(true);
 
-            ui.vertical_centered(|ui| {
+        egui::TopBottomPanel::top("header").show(ctx, |ui| {
 
-                ui.heading("Board Games");
+            ui.columns(3, |columns| {
+                columns[0].horizontal_centered(|ui| {
+                    if self.worker.is_some() {
+                        if ui.button("⬅").clicked() {
+                            self.worker = None;
+                        }
+                    }
+                    ui.heading("Board Games");
+                });
+
+                if self.worker.is_some() {
+                    columns[1].vertical_centered(|ui| {
+                        ui.heading(common::tic_tac_toe::NAME);
+                    });
+                    columns[2].with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        // display 'disconnected'/error messages at the top right ?
+                        ui.label("top right");
+                    });
+                }
+            });
+            // egui::warn_if_debug_build(ui); bugged ? keeps vertically expanding the ui
+        });
+
+        egui::TopBottomPanel::bottom("footer").show(ctx, |ui| {
+            ui.horizontal_centered(|ui| {
                 ui.add(egui::Hyperlink::from_label_and_url(
                     egui::RichText::new("Github").size(14.0),
                     "https://github.com/maygoo/board-games-rust"
                 ));
-                egui::warn_if_debug_build(ui);
+            });
+        });
 
-                ui.separator();
+        egui::CentralPanel::default().show(ctx, |ui| {
 
+            ui.vertical_centered(|ui| {
                 if self.worker.is_none() {
 
                     ui.add(egui::widgets::TextEdit::singleline(&mut self.remote_ip)
@@ -110,8 +137,6 @@ impl eframe::App for WebApp {
                     }
 
                 } else {
-                    ui.heading(common::tic_tac_toe::NAME);
-
                     #[cfg(debug_assertions)]
                     ui.label(format!{"State: {:?}", self.state});
 
@@ -157,36 +182,57 @@ impl eframe::App for WebApp {
                         Err(_) => (),
                     }
 
-                    // display board
-                    match display_board(ui, &self.state.board, self.state.turn == Turn::TurnStart) {
-                        Some((x, y)) => {
-                            self.state.turn = Turn::TurnWait;
-        
-                            self.worker
-                                .as_ref()
-                                .unwrap()
-                                .tx.send(
-                                    Message::Move(
-                                        (self.state.piece.clone(),
-                                        x,
-                                        y
-                                    )).into()
-                                ).unwrap();
-                        },
-                        None => (),
-                    }
+                    // move this into a widget ? but then how to pull out the individual click responses ?
+                    egui_extras::StripBuilder::new(ui)
+                        .size(egui_extras::Size::remainder()) // left padding
+                        .sizes(egui_extras::Size::relative(0.3), 1) // board spacing
+                        .size(egui_extras::Size::remainder()) // right padding
+                        .horizontal(|mut strip| {
+                            // left padding
+                            strip.empty();
+
+                            strip.cell(|ui| {
+                                let size = ui.available_size();
+                                match display_board(ui, &self.state.board, self.state.turn == Turn::TurnStart, size) {
+                                    Some((x, y)) => {
+                                        self.state.turn = Turn::TurnWait;
+                    
+                                        self.worker
+                                            .as_ref()
+                                            .unwrap()
+                                            .tx.send(
+                                                Message::Move(
+                                                    (self.state.piece.clone(),
+                                                    x,
+                                                    y
+                                                )).into()
+                                            ).unwrap();
+                                    },
+                                    None => (),
+                                }
+                            });
+
+                            // right padding
+                            strip.empty();
+                        });
                 }
             });
         });
     }
 }
 
-fn display_board(ui: &mut egui::Ui, board: &Board, clickable: bool) -> Option<(usize, usize)> {
+fn display_board(ui: &mut egui::Ui, board: &Board, clickable: bool, size: egui::Vec2) -> Option<(usize, usize)> {
+    // calculate total board height (i.e. of strip cell)
+    let board_height = size.y / 2.;
+    // calc size of each button
+    let button_size = egui::Vec2::new(size.x, board_height) / egui::Vec2::new(board.size as f32, board.size as f32);
+
     let mut turn = None;
     for (y, row) in board.iter().enumerate() {
         ui.horizontal(|ui| {
             for (x, cell) in row.iter().enumerate() {
-                if ui.add_sized([20.0, 20.0], egui::Button::new(cell.to_string())).clicked() && clickable {
+                //TODO make text size on button scale with button size
+                if ui.add_sized(button_size, egui::Button::new(cell.to_string())).clicked() && clickable {
                     log!("clicked pos: {x},{y}");
                     turn = Some((x, y));
                 }
