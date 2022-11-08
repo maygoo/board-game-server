@@ -1,6 +1,5 @@
 use std::{
     io::{self, prelude::*, stdout},
-    str,
     thread,
     sync::mpsc::{channel, Receiver},
 };
@@ -15,11 +14,12 @@ use common::tic_tac_toe::{
 };
 
 fn main() {
-    let ip = format!("wss://{common::REMOTE_IP}:{common::REMOTE_PORT}");
+    let ip = format!("wss://{}:{}", common::REMOTE_IP, common::REMOTE_PORT);
+    let ip_str = ip.to_string();
 
     match tungstenite::connect(ip) {
         Ok((mut socket, _)) => {
-            println!("Successfully connected to {REMOTE_IP}.");
+            println!("Successfully connected to {ip_str}.");
 
             // create two threads, one to block on io reading from stdin
             // the other to handle the TcpStream and sending/receiving
