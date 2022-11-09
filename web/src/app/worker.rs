@@ -25,26 +25,17 @@ impl Worker {
                 gloo_timers::future::sleep(WAIT).await;
 
                 // check for any incoming messages on the websocket
-                match futures::poll!(ws.next()) {
-                    futures::task::Poll::Ready(
-                        Some(
-                        Ok(
-                        WsMessage::Bytes(bytes)
-                    ))) => {
+                if let futures::task::Poll::
+                    Ready(Some(Ok(WsMessage::Bytes(bytes)))) = futures::poll!(ws.next()) {
                         // forward message through the channel
                         //log!("msg: {bytes:?}");
                         tx_t.send(bytes).unwrap();
-                    },
-                    _ => (),
-                }
+                    }
 
                 // check for any incoming messages on the channel
-                match rx_t.try_recv() {
-                    Ok(msg) => {
-                        // forward message through the websocket
-                        ws.send(WsMessage::Bytes(msg)).await.unwrap();
-                    },
-                    _ => (),
+                if let Ok(msg) = rx_t.try_recv() {
+                    // forward message through the websocket
+                    ws.send(WsMessage::Bytes(msg)).await.unwrap();
                 }
             }
         });

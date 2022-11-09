@@ -49,10 +49,8 @@ fn main() {
                     Ok(msg) if msg.is_binary() => {
                         let msg: Message = msg.into_data().into();
 
-                        // better way to do this?
-                        match play(msg, &mut state, &rx) {
-                            Some(msg) => socket.write_message(tungstenite::Message::binary(msg)).unwrap(),
-                            None => (),
+                        if let Some(msg) = play(msg, &mut state, &rx) {
+                            socket.write_message(tungstenite::Message::binary(msg)).unwrap()
                         }
                     },
                     Ok(msg) => {

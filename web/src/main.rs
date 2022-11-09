@@ -1,5 +1,3 @@
-#![warn(clippy::all, rust_2018_idioms)]
-
 use wasm_bindgen::prelude::*;
 
 mod app;
@@ -8,7 +6,7 @@ pub use app::WebApp;
 /// Defines a `println!`-esque macro that binds to js `console.log`
 #[macro_export]
 macro_rules! log {
-    ($($t:tt)*) => (crate::log_js(&format_args!($($t)*).to_string()))
+    ($($t:tt)*) => ($crate::log_js(&format_args!($($t)*).to_string()))
 }
 
 #[wasm_bindgen]

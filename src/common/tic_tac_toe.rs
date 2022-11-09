@@ -31,7 +31,7 @@ pub enum End {
     Disconnect,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub enum Piece {
     Nought,
     Cross,
@@ -65,7 +65,7 @@ pub struct ClientState {
     pub piece: Piece,
 }
 
-#[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone)]
 pub enum Turn {
     Begin,
     TurnStart,

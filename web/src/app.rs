@@ -6,6 +6,7 @@ use common::tic_tac_toe::{
     Message,
     Board,
     Turn,
+    //ServerState
 };
 use crate::log;
 
@@ -88,10 +89,8 @@ impl eframe::App for WebApp {
 
             ui.columns(3, |columns| {
                 columns[0].horizontal_centered(|ui| {
-                    if self.worker.is_some() {
-                        if ui.button("⬅").clicked() {
-                            self.worker = None;
-                        }
+                    if self.worker.is_some() && ui.button("⬅").clicked() {
+                        self.worker = None;
                     }
                     ui.heading("Board Games");
                 });
@@ -154,32 +153,29 @@ impl eframe::App for WebApp {
                     };
 
                     // consume messages from the channel
-                    match self.worker.as_ref().unwrap().rx.try_recv() {
-                        Ok(msg) => {
-                            match msg.into() {
-                                Message::Preamble(config) => {
-                                    self.state = config;
-                                    self.state.board = Board::new(self.state.board.size);
-                                },
-                                Message::WaitTurn => self.state.turn = Turn::TurnWait,
-                                Message::YourTurn => self.state.turn =Turn::TurnStart,
-                                Message::Move((p, x, y)) => {
-                                    self.state.board.place(p, x, y);
-                                    self.info.unlock();
-                                },
-                                Message::InvalidMove(err) => {
-                                    self.info.unlock().update(err).lock();
-                                    self.state.turn = Turn::TurnStart;
-                                },
-                                Message::GameOver(end) => {
-                                    self.info.unlock().update(format!("{end:?}")).lock();
+                    if let Ok(msg) = self.worker.as_ref().unwrap().rx.try_recv() {
+                        match msg.into() {
+                            Message::Preamble(config) => {
+                                self.state = config;
+                                self.state.board = Board::new(self.state.board.size);
+                            },
+                            Message::WaitTurn => self.state.turn = Turn::TurnWait,
+                            Message::YourTurn => self.state.turn =Turn::TurnStart,
+                            Message::Move((p, x, y)) => {
+                                self.state.board.place(p, x, y);
+                                self.info.unlock();
+                            },
+                            Message::InvalidMove(err) => {
+                                self.info.unlock().update(err).lock();
+                                self.state.turn = Turn::TurnStart;
+                            },
+                            Message::GameOver(end) => {
+                                self.info.unlock().update(format!("{end:?}")).lock();
 
-                                    self.state.turn = Turn::End;
-                                    // display window popup
-                                },
-                            }
-                        },
-                        Err(_) => (),
+                                self.state.turn = Turn::End;
+                                // display window popup
+                            },
+                        }
                     }
 
                     // move this into a widget ? but then how to pull out the individual click responses ?
@@ -193,22 +189,19 @@ impl eframe::App for WebApp {
 
                             strip.cell(|ui| {
                                 let size = ui.available_size();
-                                match display_board(ui, &self.state.board, self.state.turn == Turn::TurnStart, size) {
-                                    Some((x, y)) => {
-                                        self.state.turn = Turn::TurnWait;
+                                if let Some((x, y)) = display_board(ui, &self.state.board, self.state.turn == Turn::TurnStart, size) {
+                                    self.state.turn = Turn::TurnWait;
                     
-                                        self.worker
-                                            .as_ref()
-                                            .unwrap()
-                                            .tx.send(
-                                                Message::Move(
-                                                    (self.state.piece.clone(),
-                                                    x,
-                                                    y
-                                                )).into()
-                                            ).unwrap();
-                                    },
-                                    None => (),
+                                    self.worker
+                                        .as_ref()
+                                        .unwrap()
+                                        .tx.send(
+                                            Message::Move(
+                                                (self.state.piece.clone(),
+                                                x,
+                                                y
+                                            )).into()
+                                        ).unwrap();
                                 }
                             });
 

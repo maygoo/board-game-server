@@ -116,11 +116,8 @@ fn handle_connection(stream: TlsStream<TcpStream>, lobby: &games::Lobby) {
             }
 
             // receive data through channel from game controller
-            match rx_t.try_recv() {
-                Ok(send) => {
-                    websocket.write_message(tungstenite::Message::binary(send)).unwrap();
-                },
-                _ => (),
+            if let Ok(send) = rx_t.try_recv() {
+                websocket.write_message(tungstenite::Message::binary(send)).unwrap();
             }
         }
     });

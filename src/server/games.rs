@@ -40,7 +40,7 @@ impl Session {
 
     pub fn broadcast(player1: &Player, player2: &Player, msg: Message) -> Result<(), SendError<ChannelBuf>> {
         Session::send(player1, msg.clone())?;
-        Session::send(player2, msg.clone())?;
+        Session::send(player2, msg)?;
         Ok(())
     }
 }
@@ -55,7 +55,7 @@ impl Session {
 } */
 
 pub fn try_recv(player: &Player) -> Result<Message, TryRecvError> {
-    player.rx.try_recv().and_then(|msg| Ok(dbg!(msg.into())))
+    player.rx.try_recv().map(|msg| dbg!(msg.into()))
 }
 
 pub struct Lobby {
@@ -103,13 +103,13 @@ impl Lobby {
                 thread::sleep(WAIT);
                 let mut data = players.lock().unwrap();
                 let pair = Lobby::find_pair(&mut data);
-                if pair.is_some() {
+                if let Some(pair) = pair {
                     // go through some process of selecting a game
                     let players2 = Arc::clone(&players);
                     thread::spawn(move|| {
                         tic_tac_toe::begin(
                             players2,
-                            Session::new(pair.unwrap())
+                            Session::new(pair)
                         );
                     });
                 }
@@ -118,7 +118,7 @@ impl Lobby {
     }
 
     // return two addrs for both players
-    fn find_pair(players: &mut Vec<Player>) -> Option<(SocketAddr, SocketAddr)> {
+    fn find_pair(players: &mut [Player]) -> Option<(SocketAddr, SocketAddr)> {
         let mut waiting: Vec<&mut Player> = players.iter_mut().filter(|player| player.status == Status::Waiting).collect();
 
         if waiting.len() < 2 { 
