@@ -231,8 +231,8 @@ fn display_board(ui: &mut egui::Ui, board: &Board, clickable: bool, size: egui::
     for (y, row) in board.iter().enumerate() {
         ui.horizontal(|ui| {
             for (x, cell) in row.iter().enumerate() {
-                //TODO make text size on button scale with button size
-                if ui.add_sized(button_size, egui::Button::new(cell.to_string())).clicked() && clickable {
+                let button_font = egui::RichText::new(cell.to_string()).size(button_size.y);
+                if ui.add_sized(button_size, egui::Button::new(button_font)).clicked() && clickable {
                     log!("clicked pos: {x},{y}");
                     turn = Some((x, y));
                 }
