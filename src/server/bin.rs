@@ -11,6 +11,19 @@ use common::{WAIT, ChannelBuf};
 
 mod games;
 
+/// Starts the board game server.
+/// 
+/// Default port is specified in [`common`](common::REMOTE_PORT)
+/// but can be changed by passing in a cli argument
+/// when running the server.
+/// 
+/// The server requires a valid `pkcs #12` keystore. To
+/// generate one for local testing you can use the following
+/// commands:
+/// ```bash
+/// openssl req -new -newkey rsa:4096 -x509 -nodes -out cert.crt -keyout key.pem
+/// openssl pkcs12 -export -out keystore.pkcs -inkey key.pem -in cert.crt
+/// ```
 fn main() {
     // initialise server with default binding 0.0.0.0:3334
     const DEFAULT_IP: [u8; 4] = [0,0,0,0];
