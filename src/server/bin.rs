@@ -7,7 +7,7 @@ use std::{
 };
 use native_tls::{Identity, TlsAcceptor, TlsStream};
 
-use common::{WAIT, ChannelBuf};
+use common::ChannelBuf;
 
 mod games;
 
@@ -90,8 +90,6 @@ fn handle_connection(stream: TlsStream<TcpStream>, lobby: &games::Lobby) {
     let (tx, rx_t) = channel::<ChannelBuf>();
 
     let t = thread::spawn(move|| {     
-        //client.set_nonblocking(true).unwrap();
-
         loop {
             match websocket.read_message() {
                 Ok(msg) if msg.is_binary() => {

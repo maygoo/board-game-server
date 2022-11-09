@@ -5,10 +5,7 @@ use std::{
     sync::mpsc::{Receiver, Sender, SendError, TryRecvError},
 };
 
-use super::{
-    WAIT,
-    ChannelBuf,
-};
+use common::{THREAD_SLEEP, ChannelBuf, ServerStatus};
 
 use common::tic_tac_toe::Message;
 
@@ -100,7 +97,7 @@ impl Lobby {
 
         thread::spawn(move|| {
             loop {
-                thread::sleep(WAIT);
+                thread::sleep(THREAD_SLEEP);
                 let mut data = players.lock().unwrap();
                 let pair = Lobby::find_pair(&mut data);
                 if let Some(pair) = pair {
@@ -137,9 +134,22 @@ impl Lobby {
     pub fn monitor(&self) {
         let players = Arc::clone(&self.players);
         thread::spawn(move|| {
+            let mut ping = common::PING_INTERVAL;
             loop {
-                thread::sleep(WAIT);
+                thread::sleep(THREAD_SLEEP);
                 let mut data = players.lock().unwrap();
+
+                // count down from the ping interval in terms of thread sleeps
+                if ping > 0 {
+                    ping -= 1;
+                } else {
+                    ping = common::PING_INTERVAL;
+                    let status = ServerStatus { n_players: data.len() };
+                    let msg = common::tic_tac_toe::Message::Status(status);
+                    for player in data.iter() {
+                        Session::send(player, msg.clone()).unwrap();
+                    }
+                }
                 
                 // print active connections only if connections change
                 let initial_len = data.len();

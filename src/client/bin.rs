@@ -162,5 +162,9 @@ fn play(msg: Message, state: &mut ClientState, rx: &Receiver<String>) -> Option<
             }
             None
         }
+        Message::Status(status) => {
+            println!("Players online: {}", status.n_players);
+            None
+        }
     }
 }

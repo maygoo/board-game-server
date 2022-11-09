@@ -4,7 +4,7 @@ use wasm_bindgen_futures::spawn_local;
 use futures::{SinkExt, StreamExt};
 use gloo_net::websocket::futures::WebSocket;
 
-use common::{WAIT, ChannelBuf};
+use common::{THREAD_SLEEP, ChannelBuf};
 use crate::log;
 
 pub struct Worker {
@@ -22,7 +22,7 @@ impl Worker {
 
             loop {
                 // should equate to a thread::sleep
-                gloo_timers::future::sleep(WAIT).await;
+                gloo_timers::future::sleep(THREAD_SLEEP).await;
 
                 // check for any incoming messages on the websocket
                 if let futures::task::Poll::

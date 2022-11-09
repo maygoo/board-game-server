@@ -10,6 +10,8 @@ pub enum Message {
     // Nought or Cross piece means they win
     // Empty piece means game is over i.e. disconnect
     GameOver(End),
+    // temporary, move to standard server message
+    Status(super::ServerStatus),
 }
 
 impl From<Vec<u8>> for Message {

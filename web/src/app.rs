@@ -53,6 +53,7 @@ pub struct WebApp {
     state: ClientState,
     worker: Option<Worker>,
     info: Info,
+    n_players: usize,
 }
 
 impl Default for WebApp {
@@ -62,6 +63,7 @@ impl Default for WebApp {
             state: ClientState::new(String::new(), Piece::Empty, 0),
             worker: None,
             info: Info::new(),
+            n_players: 0,
         }
     }
 }
@@ -114,6 +116,8 @@ impl eframe::App for WebApp {
                     egui::RichText::new("Github").size(14.0),
                     "https://github.com/maygoo/board-games-rust"
                 ));
+
+                ui.label(format!("Players online: {}", self.n_players));
             });
         });
 
@@ -174,7 +178,10 @@ impl eframe::App for WebApp {
 
                                 self.state.turn = Turn::End;
                                 // display window popup
-                            },
+                            }
+                            Message::Status(status) => {
+                                self.n_players = status.n_players;
+                            }
                         }
                     }
 

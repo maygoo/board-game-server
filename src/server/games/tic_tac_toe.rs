@@ -3,11 +3,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::{
-    WAIT,
-    games::{Player, Session}
-};
+use crate::games::{Player, Session};
 
+use common::THREAD_SLEEP;
 use common::tic_tac_toe::{
     self,
     Message,
@@ -26,7 +24,7 @@ pub fn begin(players: Arc<Mutex<Vec<Player>>>, mut session: super::Session) {
     println!("Started {:?} with {} and {}", tic_tac_toe::NAME, session.player1, session.player2);
     
     loop {
-        thread::sleep(WAIT);
+        thread::sleep(THREAD_SLEEP);
         let mut data = players.lock().unwrap();
         // check that both players are still connected
         let mut players: Vec<&mut Player> = data
