@@ -8,11 +8,13 @@ use std::time::Duration;
 pub const WAIT_MS: u32 = 100;
 /// Defines a standard wait time for threads to sleep
 /// while waiting for other threads to unlock shared
-/// resources. Value defined in ms by `common::WAIT_MS`.
+/// resources. Value defined in ms by [`WAIT_MS`].
 pub const WAIT: Duration = Duration::from_millis(WAIT_MS as u64);
 
 /// Remote IP for the client to connect to by default.
-/// Changes from local to remotebased on `--release` or `--debug` flags.
+/// 
+/// Changes from `127.0.0.1` for debug builds and
+/// `ws.gh.maygoo.au` for `--release` builds.
 #[cfg(debug_assertions)]
 pub const REMOTE_IP: &str = "127.0.0.1";
 #[cfg(not(debug_assertions))]
