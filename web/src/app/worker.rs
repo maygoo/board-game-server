@@ -34,6 +34,11 @@ impl Worker {
 
                 // check for any incoming messages on the channel
                 if let Ok(msg) = rx_t.try_recv() {
+                    // quick and dirty exit code to break out of this worker thread
+                    // currently causes an unknown JS error
+                    // Uncaught Error: closure invoked recursively or destroyed already
+                    if msg == vec![0u8] { break; }
+
                     // forward message through the websocket
                     ws.send(WsMessage::Bytes(msg)).await.unwrap();
                 }

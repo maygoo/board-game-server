@@ -92,6 +92,7 @@ impl eframe::App for WebApp {
             ui.columns(3, |columns| {
                 columns[0].horizontal_centered(|ui| {
                     if self.worker.is_some() && ui.button("⬅").clicked() {
+                        self.worker.as_ref().unwrap().tx.send(vec![0u8]).unwrap();
                         self.worker = None;
                     }
                     ui.heading("Board Games");
